@@ -1,0 +1,39 @@
+{
+  "label": "Illustrative classroom rules v1; not health or official AQI limits",
+  "record_interval_seconds": 5,
+  "max_trend_gap_seconds": 15,
+  "trend_window": 6,
+  "trend_min_samples": 4,
+  "thresholds": {
+    "pm25_ug_m3": {
+      "watch": 25,
+      "high": 75
+    },
+    "pm10_ug_m3": {
+      "watch": 75,
+      "high": 150
+    },
+    "tvoc_ppb": {
+      "watch": 300,
+      "high": 1000
+    },
+    "eco2_ppm": {
+      "watch": 1000,
+      "high": 2000
+    }
+  },
+  "trends": {
+    "pm25_ug_m3": {
+      "per_minute": 12,
+      "above_previous_mean": 3
+    },
+    "tvoc_ppb": {
+      "per_minute": 120,
+      "above_previous_mean": 30
+    },
+    "eco2_ppm": {
+      "per_minute": 120,
+      "above_previous_mean": 30
+    }
+  }
+}
