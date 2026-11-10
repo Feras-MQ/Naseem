@@ -1,0 +1,60 @@
+Naseem local baseline validation
+Run date UTC: 2026-11-10 08:59:03
+Python 3.12.14
+
+test_bad_replay_nonzero (test_naseem.CliTests.test_bad_replay_nonzero) ... ok
+test_demo_replay_export (test_naseem.CliTests.test_demo_replay_export) ... ok
+test_existing_export_protected (test_naseem.CliTests.test_existing_export_protected) ... ok
+test_default_and_hash (test_naseem.ConfigTests.test_default_and_hash) ... ok
+test_invalid_configs (test_naseem.ConfigTests.test_invalid_configs) ... ok
+test_incomplete_final_frame (test_naseem.FramingTests.test_incomplete_final_frame) ... ok
+test_overflow_recovers (test_naseem.FramingTests.test_overflow_recovers) ... ok
+test_split_crlf_and_multiple_lines (test_naseem.FramingTests.test_split_crlf_and_multiple_lines) ... ok
+test_database_not_overwritten_by_export (test_naseem.JournalTests.test_database_not_overwritten_by_export) ... ok
+test_duplicate_and_out_of_order_rejected (test_naseem.JournalTests.test_duplicate_and_out_of_order_rejected) ... ok
+test_hardware_mode_refuses_simulation (test_naseem.JournalTests.test_hardware_mode_refuses_simulation) ... ok
+test_invalid_persists_and_resets_history (test_naseem.JournalTests.test_invalid_persists_and_resets_history) ... ok
+test_mixed_device_or_source_rejected (test_naseem.JournalTests.test_mixed_device_or_source_rejected) ... ok
+test_persistence_export_provenance (test_naseem.JournalTests.test_persistence_export_provenance) ... ok
+test_reboot_accepts_and_old_boot_rejects (test_naseem.JournalTests.test_reboot_accepts_and_old_boot_rejects) ... ok
+test_huge_configuration_number_is_rejected (test_naseem.NumericRobustnessTests.test_huge_configuration_number_is_rejected) ... ok
+test_huge_integer_reading_is_rejected_without_crashing (test_naseem.NumericRobustnessTests.test_huge_integer_reading_is_rejected_without_crashing) ... ok
+test_any_missing_or_warming_never_normal (test_naseem.RuleTests.test_any_missing_or_warming_never_normal) ... ok
+test_gap_and_reboot_clear_history (test_naseem.RuleTests.test_gap_and_reboot_clear_history) ... ok
+test_lcd_and_wire_bounded (test_naseem.RuleTests.test_lcd_and_wire_bounded) ... ok
+test_mq_raw_not_co_rule (test_naseem.RuleTests.test_mq_raw_not_co_rule) ... ok
+test_normal_is_not_safety_claim (test_naseem.RuleTests.test_normal_is_not_safety_claim) ... ok
+test_partial_does_not_hide_high (test_naseem.RuleTests.test_partial_does_not_hide_high) ... ok
+test_rising_below_threshold (test_naseem.RuleTests.test_rising_below_threshold) ... ok
+test_sensor_failure_clears_its_history (test_naseem.RuleTests.test_sensor_failure_clears_its_history) ... ok
+test_threshold_boundaries (test_naseem.RuleTests.test_threshold_boundaries) ... ok
+test_large_uptime_retains_slope_precision (test_naseem.SerialAdapterTests.test_large_uptime_retains_slope_precision) ... ok
+test_mock_stale_stream_logged (test_naseem.SerialAdapterTests.test_mock_stale_stream_logged) ... ok
+test_mock_usb_roundtrip_and_compact_response (test_naseem.SerialAdapterTests.test_mock_usb_roundtrip_and_compact_response) ... ok
+test_all_warmup_scenarios_parse (test_naseem.ValidationTests.test_all_warmup_scenarios_parse) ... ok
+test_early_sgp_ok_rejected (test_naseem.ValidationTests.test_early_sgp_ok_rejected) ... ok
+test_invalid_values (test_naseem.ValidationTests.test_invalid_values) ... ok
+test_malformed_and_oversized (test_naseem.ValidationTests.test_malformed_and_oversized) ... ok
+test_missing_nulls_accepted (test_naseem.ValidationTests.test_missing_nulls_accepted) ... ok
+test_no_co_ppm_field (test_naseem.ValidationTests.test_no_co_ppm_field) ... ok
+test_sensor_status_mismatch (test_naseem.ValidationTests.test_sensor_status_mismatch) ... ok
+test_strict_metadata (test_naseem.ValidationTests.test_strict_metadata) ... ok
+test_valid (test_naseem.ValidationTests.test_valid) ... ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 0.082s
+
+OK
+
+Bytecode compile check:
+PASS
+
+Firmware helper host C++ tests (not ESP32 compilation):
+Protocol guard assertions passed (host C++; not ESP32 or hardware tests).
+PASS
+
+Python wheel build succeeded with pip wheel --no-build-isolation --no-deps (standard-library core).
+Not run: actual USB device, ESP32 compilation/flashing, sensor acquisition, LCD, calibration or room experiments.
+
+Synthetic demo only:
+{"run_id": "c26f2624b0cc4c5f90b8e30eb7c7cc17", "mode": "simulate", "accepted": 72, "rejected": 0, "status_counts": {"UNKNOWN": 12, "NORMAL": 45, "WATCH": 9, "HIGH": 6}, "db": "examples/SYNTHETIC_demo.sqlite3"}
