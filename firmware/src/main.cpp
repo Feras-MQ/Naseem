@@ -1,26 +1,28 @@
 // Academic scaffold ONLY. Not hardware tested. Not a safety device.
-// No sensors, LCD, heater, relays, or GPIO outputs are initialized by this build.
+// Sensor IO is disabled unless NASEEM_VERIFIED_WIRING=1. LCD/MQ7 stay disabled.
 #include <Arduino.h>
 #define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
 #include <esp_system.h>
 #include <initializer_list>
 #include "protocol_guard.h"
+#include "sensor_adapters.h"
 
 namespace {
-// Reference mapping only, NOT validated wiring instructions.
-constexpr int kPmsRx = 16, kPmsTx = 17, kI2cSda = 21, kI2cScl = 22;
-constexpr int kMq7Adc = 34;
+// Actual proposed pin defaults and enable flags live in sensor_config.h.
 constexpr size_t kInputCapacity = 512;
 char input[kInputCapacity];
 size_t inputLength = 0;
 bool discardLine = false;
 char bootId[33];
 uint32_t nextSequence = 0;
-uint32_t lastRecord = 0, lastSgpTick = 0;
+uint32_t lastRecord = 0;
 bool sequenceExhausted = false;
 naseem::ReplyGuard replyGuard;
 naseem::MonotonicUptime uptime;
+naseem::SensorAdapters sensors;
+uint8_t sentPollutants = 0, acceptedPollutants = 0;
+const char* sentQuality = "MISSING";
 char lcdLine1[17] = "UNKNOWN";
 char lcdLine2[17] = "SENSORS MISSING";
 
@@ -35,11 +37,8 @@ void displayTick() {
   // Never print LCD/debug text to Serial: that stream is newline JSON only.
 }
 
-void sgp30OneSecondTick(uint32_t now) {
-  (void)now;
-  // Acquisition extension point; intentionally absent, not simulated hardware.
-  // An actual SGP30 adapter must measure at 1 Hz independently of record output,
-  // invalidate its first >=15 s after IAQinit, and invalidate on missed cadence.
+void pollSgp30(uint32_t now) {
+  sensors.sgpTick(now);
 }
 
 void emitReading(uint64_t uptimeMs) {
@@ -53,13 +52,32 @@ void emitReading(uint64_t uptimeMs) {
   doc["uptime_ms"] = uptimeMs;
   doc["source"] = "hardware";
   JsonObject statuses = doc.createNestedObject("sensor_status");
-  for (const char* name : {"pms7003", "sgp30", "bme280", "mq7"})
-    statuses[name] = "missing";
+  const uint32_t now = millis();
+  statuses["pms7003"] = sensors.pmsStatus(now);
+  statuses["sgp30"] = sensors.sgpStatus(now);
+  statuses["bme280"] = sensors.bmeStatus(now);
+  statuses["mq7"] = "missing";
+  sentPollutants = sensors.pollutantMask(now);
+  sentQuality = sensors.quality(now);
   JsonObject readings = doc.createNestedObject("readings");
   for (const char* name : {"pm1_ug_m3", "pm25_ug_m3", "pm10_ug_m3",
                           "tvoc_ppb", "eco2_ppm", "temperature_c",
                           "humidity_pct", "pressure_hpa", "mq7_adc_raw"})
     readings[name] = nullptr;
+  if (sentPollutants & 1) {
+    readings["pm1_ug_m3"] = sensors.pms.pm1;
+    readings["pm25_ug_m3"] = sensors.pms.pm25;
+    readings["pm10_ug_m3"] = sensors.pms.pm10;
+  }
+  if (sentPollutants & 2) {
+    readings["tvoc_ppb"] = sensors.tvoc;
+    readings["eco2_ppm"] = sensors.eco2;
+  }
+  if (!strcmp(sensors.bmeStatus(now), "ok")) {
+    readings["temperature_c"] = sensors.temperature;
+    readings["humidity_pct"] = sensors.humidity;
+    readings["pressure_hpa"] = sensors.pressure;
+  }
   serializeJson(doc, Serial);
   Serial.write('\n');
   replyGuard.onSent(nextSequence, millis());
@@ -95,12 +113,22 @@ void consumeResponse(uint32_t now) {
     JsonString line = doc[name].as<JsonString>();
     if (!naseem::asciiLcd(line.c_str(), line.size())) return;
   }
-  // Independent local safety gate: this build has no actual measurements.
-  // Do not let a malformed/misconfigured host turn absent sensors into NORMAL.
-  if (strcmp(doc["prototype_status"], "UNKNOWN") != 0 ||
-      strcmp(doc["data_quality"], "MISSING") != 0) return;
+  // MQ7 is always missing, so NORMAL/VALID must never be accepted. WATCH/HIGH
+  // may reflect host rules only when ALL pollutants valid in the sent record
+  // remain fresh locally (the protocol does not identify the triggering sensor). Rules/trends remain on the host; this is not an alarm.
+  const char* status = doc["prototype_status"];
+  const char* quality = doc["data_quality"];
+  const bool elevated = !strcmp(status, "WATCH") || !strcmp(status, "HIGH");
+  const uint8_t support = naseem::allSupportFresh(sentPollutants, sensors.pollutantMask(now))
+    ? sentPollutants : 0;
+  if (!naseem::allowClassification(status, quality, sentQuality, support)) return;
   replyGuard.onAccepted(now);
-  setUnknown("SENSORS MISSING");  // Do not display arbitrary reassuring host text.
+  acceptedPollutants = elevated ? support : 0;
+  if (elevated) {
+    snprintf(lcdLine1, sizeof(lcdLine1), "PROTOTYPE:%s", status);
+    snprintf(lcdLine2, sizeof(lcdLine2), "%s", "PARTIAL DATA");
+  } else setUnknown("CHECK SENSORS");
+
 }
 
 void pollHost() {
@@ -132,7 +160,8 @@ void setup() {
            static_cast<unsigned long>(esp_random()),
            static_cast<unsigned long>(esp_random()),
            static_cast<unsigned long>(esp_random()));
-  lastRecord = lastSgpTick = millis();
+  sensors.begin();
+  lastRecord = millis();
   emitReading(uptime.sample(lastRecord));
 }
 
@@ -140,15 +169,18 @@ void loop() {
   pollHost();
   const uint32_t now = millis();
   uptime.sample(now);
-  if (naseem::elapsed(now, lastSgpTick, naseem::kSgp30Ms)) {
-    lastSgpTick = now; // Never burst multiple delayed measurements as catch-up.
-    sgp30OneSecondTick(now);
-  }
+  sensors.poll(now);
+  // The adapter owns the ONLY SGP scheduler; poll every loop after any I2C work.
+  pollSgp30(millis());
   if (naseem::elapsed(now, lastRecord, naseem::kRecordMs)) {
     lastRecord = now;
     emitReading(uptime.milliseconds);
   }
   if (replyGuard.timedOut(now)) setUnknown("HOST OFFLINE");
+  if (acceptedPollutants && !naseem::allSupportFresh(acceptedPollutants, sensors.pollutantMask(millis()))) {
+    acceptedPollutants = 0;
+    setUnknown("DATA STALE");
+  }
   displayTick();
   yield();
 }

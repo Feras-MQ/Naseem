@@ -326,4 +326,32 @@ class NumericRobustnessTests(unittest.TestCase):
         obj = load_config(); obj["thresholds"]["pm25_ug_m3"]["high"] = 10**400
         with self.assertRaises(ValidationError): validate_config(obj)
 
+
+
+
+class EnabledHardwareContractTests(unittest.TestCase):
+    """Synthetic packet fixtures, not observations from real hardware."""
+    def test_three_ready_sensors_still_cannot_claim_normal_without_mq7(self):
+        obj = packet(); obj["source"] = "hardware"
+        obj["sensor_status"]["mq7"] = "missing"; obj["readings"]["mq7_adc_raw"] = None
+        engine = RuleEngine(load_config())
+        result = engine.evaluate(parse_line(json.dumps(obj)))
+        self.assertEqual((result.prototype_status, result.data_quality), ("UNKNOWN", "PARTIAL"))
+        obj["readings"]["pm25_ug_m3"] = 80
+        result = engine.evaluate(parse_line(json.dumps(obj)))
+        self.assertEqual((result.prototype_status, result.data_quality), ("HIGH", "PARTIAL"))
+
+    def test_midrun_sgp_reinitialization_excludes_its_values(self):
+        obj = packet(100); obj["source"] = "hardware"
+        obj["sensor_status"]["sgp30"] = "warming_up"
+        obj["readings"]["tvoc_ppb"] = None; obj["readings"]["eco2_ppm"] = None
+        result = RuleEngine(load_config()).evaluate(parse_line(json.dumps(obj)))
+        self.assertEqual((result.prototype_status, result.data_quality), ("UNKNOWN", "WARMING_UP"))
+
+    def test_journal_records_current_software_version(self):
+        from naseem import __version__
+        with tempfile.TemporaryDirectory() as temp:
+            with Journal(Path(temp) / "version.sqlite3", "test", load_config()) as journal:
+                self.assertEqual(journal.connection.execute("SELECT software_version FROM runs").fetchone()[0], __version__)
+
 if __name__ == "__main__": unittest.main()

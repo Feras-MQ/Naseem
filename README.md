@@ -1,11 +1,13 @@
-# Naseem local prototype baseline
+# Naseem local prototype baseline, version 0.2
 
-A runnable **academic software baseline**, based on the supplied *Indoor Air Quality Monitoring System with AI* report and slides. It implements local Python processing, a deterministic simulator, USB serial ingestion, SQLite journaling, explainable configurable rules, trend detection and CSV export. **No web/mobile dashboard or cloud service.**
+A runnable **academic software baseline**, based on the supplied *Indoor Air Quality Monitoring System with AI* report and slides. It implements local Python processing, a deterministic simulator, USB serial ingestion, SQLite journaling, explainable configurable rules, trend detection and CSV export. Optional PMS7003, SGP30 and BME280 firmware adapters are included but disabled in the default build. **No web/mobile dashboard or cloud service.**
 
 ## What is and is not complete
 
 - **Implemented and tested locally:** JSON protocol validation, synthetic simulation, replay, Python rule engine, SQLite/CSV, serial adapter using a fake device, and firmware timing/response guard tests.
-- **Scaffold only:** ESP32 acquisition and physical LCD output. The firmware intentionally sends all-null/missing readings and remains UNKNOWN. It does not initialize sensor buses, GPIO outputs or MQ-7 heaters.
+- **Implemented, not tested on ESP32 hardware:** optional PMS7003 UART parsing/acquisition, SGP30 one-second IAQ acquisition and BME280 environmental acquisition. Host tests cover their portable parsing/readiness helpers, not the actual drivers.
+- **Gated by default:** the dry firmware still sends null/missing readings and remains UNKNOWN without initializing sensor buses. A separate opt-in configuration enables the three adapters only after wiring is verified.
+- **Still scaffold only:** MQ-7 acquisition/heater control and physical LCD writes. Both remain disabled. No CO ppm conversion is supplied.
 - **Not verified:** real serial hardware, ESP32 compilation, any actual sensor, wiring, calibration, electrical behavior, or measurement accuracy. No firmware was flashed. No device was connected.
 - **No measured experimental results are included.** Every example data row is labelled `synthetic`. Demo output is not evidence of physical performance.
 
@@ -48,7 +50,7 @@ python -m naseem serial --port YOUR_CONFIRMED_PORT --db hardware.sqlite3 --verbo
 
 Port examples are `COM3` on Windows or `/dev/ttyUSB0` on Linux, but **neither is assumed to be your device**. Select the exact port yourself; close any serial monitor using it. Default baud is 115200. Opening a serial port can reset some ESP32 boards through the USB adapter. Ctrl+C stops recording; there is no automatic reconnect or network connection. A changed port/device needs a new explicit run. `--samples 10` can bound a test run.
 
-Hardware mode refuses packets marked `synthetic`. Source labels are provenance supplied by the device, not cryptographic attestation. Both sides must enforce timeouts: the Python adapter reports UNKNOWN after 15 seconds without a valid record; the dry firmware rejects mismatched/stale/duplicate host responses and falls back to UNKNOWN on a 15-second host timeout. A fresh packet with missing sensors is still UNKNOWN. Database commits happen before sending a success response. On an I/O/database failure the process stops; the device must honor its timeout.
+Hardware mode refuses packets marked `synthetic`. Source labels are provenance supplied by the device, not cryptographic attestation. Both sides must enforce timeouts: the Python adapter reports UNKNOWN after 15 seconds without a valid record; the dry firmware rejects mismatched/stale/duplicate host responses and falls back to UNKNOWN on a 15-second host timeout. A fresh packet with missing sensors cannot be NORMAL; available fresh pollutant channels can still trigger WATCH/HIGH while quality remains incomplete. Database commits happen before sending a success response. On an I/O/database failure the process stops; the device must honor its timeout.
 
 ## Rules and data quality
 
@@ -65,10 +67,10 @@ Threshold comparison is inclusive. Any valid measured channel reaching HIGH wins
 
 Trends use linear-regression slope over up to six samples, a minimum of four, and current value above the previous sample mean. Rates are normalized to actual device elapsed time, not PC processing speed. Default examples: PM2.5 slope ≥12 µg/m³/min and +3 above previous mean; TVOC/eCO2 slope ≥120 units/min and +30. Histories reset on reboot, invalid input, a sensor not ready, or a gap over 15 seconds. There is no trained ML model, prediction-accuracy claim or automatic intervention.
 
-Each run stores the full rule configuration and SHA-256 hash, software version and source/mode. See [protocol](docs/PROTOCOL.md), [validation](docs/VALIDATION.md), [hardware handoff](docs/HARDWARE_HANDOFF.md) and [firmware limitations](firmware/README.md).
+Each run stores the full rule configuration and SHA-256 hash, software version and source/mode. See [protocol](docs/PROTOCOL.md), [validation](docs/VALIDATION.md), [supplied hardware](docs/HARDWARE_INVENTORY.md), [manufacturer references](docs/SENSOR_SOURCES.md), [hardware handoff](docs/HARDWARE_HANDOFF.md) and [firmware limitations](firmware/README.md).
 
 ## Assumptions and next step
 
-Assumptions: local desktop Python 3.10+, one ESP32 stream per run, PMS7003/SGP30/BME280/MQ-7 and 16×2 I2C LCD as named in the report. Exact board/module variants, power arrangement, OS and ports were not supplied. The Python baseline is OS-neutral and was tested here on Linux/Python 3.12.14. Firmware board `esp32dev` is a provisional compile target, not verified hardware selection.
+Assumptions: local desktop Python 3.10+, one ESP32 stream per run, PMS7003/SGP30/BME280/MQ-7 and 16×2 I2C LCD as named in the report. The supplied hardware references are HiLetgo ESP-WROOM-32, OEM PMS7003, Hailege GY-SGP30, RELAND SUN BME280 labelled 5V and TopHomer MQ-7; see the inventory for product identifiers. Exact PCB revisions, power/level-shifting arrangements, LCD identity, OS and ports remain unverified. The Python baseline is OS-neutral and was tested here on Linux/Python 3.12.14. Firmware board `esp32dev` is a family-level starting target, not verified board wiring.
 
-To turn this into a real prototype, first confirm exact board and sensor module photographs/part numbers, LCD backpack voltage/controller and operating system. Then implement and verify one sensor driver at a time using the checklists. No account, cloud, dashboard, dataset download or Kaggle claim is needed for this baseline.
+To turn this into a real prototype, confirm board/module photographs, actual power and logic levels, LCD backpack voltage/controller and operating system. Then compile, enable and physically verify one adapter at a time using the checklists. The available optional sensor target does not itself confirm safe wiring or authorize flashing. No account, cloud, dashboard, dataset download or Kaggle claim is needed for this baseline.

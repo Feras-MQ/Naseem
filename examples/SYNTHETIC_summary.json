@@ -1,1 +1,1 @@
-{"run_id": "c26f2624b0cc4c5f90b8e30eb7c7cc17", "mode": "simulate", "accepted": 72, "rejected": 0, "status_counts": {"UNKNOWN": 12, "NORMAL": 45, "WATCH": 9, "HIGH": 6}, "db": "examples/SYNTHETIC_demo.sqlite3"}
+{"run_id": "b9fb4724d6e74664904ed39b7a5d772b", "mode": "simulate", "accepted": 72, "rejected": 0, "status_counts": {"UNKNOWN": 12, "NORMAL": 45, "WATCH": 9, "HIGH": 6}, "db": "examples/SYNTHETIC_demo.sqlite3"}

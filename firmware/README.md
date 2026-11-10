@@ -1,106 +1,173 @@
-# Naseem ESP32 dry firmware scaffold
+# Naseem ESP32 firmware prototype
 
-**NOT hardware tested. NOT a safety device.** This is a compile-oriented Arduino
-starting point for an academic prototype, not completed sensor firmware. It must
-not be used to decide whether a room is safe, detect dangerous gas, or replace
-certified alarms. No hardware has been wired, flashed, or exercised.
+**NOT hardware tested. NOT a safety device.** No hardware has been connected,
+flashed, or exercised. This is academic prototype firmware, not a certified gas,
+CO, smoke, or air-quality alarm. It cannot establish whether a room is safe.
 
-## What this version does
+## Default and explicitly enabled builds
 
-- Emits bounded, newline-delimited schema-v1 JSON over USB serial at 115200 baud,
-  on boot and about every five seconds. `source: "hardware"` identifies the device
-  transport, **not a claim that measurements exist**. Every sensor is `missing`
-  and every reading is JSON `null`; it never fabricates clean-air values.
-- Parses bounded host responses (maximum 511 bytes before newline), rejecting
-  malformed fields, wrong device/boot IDs, unknown enums, stale sequences,
-  duplicates, replies older than five seconds, and non-printable/overlength LCD
-  lines. An oversized line is discarded through its newline.
-- Accepts only `UNKNOWN` + `MISSING` in this dry build. Host text cannot override
-  the local missing-sensor gate. Internal display lines are `UNKNOWN` /
-  `SENSORS MISSING`; no fresh accepted reply for 15 seconds yields `UNKNOWN` /
-  `HOST OFFLINE`. Before the first reply the host is offline.
-- Has a separate one-second **empty** SGP30 acquisition hook, not a five-second
-  measurement loop. No long delays or unbounded receive loops are used.
-- Does not initialize UART2, I2C, ADC, LCD, heater, outputs, Wi-Fi, Bluetooth, or
-  persistent storage. `displayTick()` is deliberately empty. There is currently
-  **no physical LCD output and no sensor acquisition**, even with connected parts.
+`pio run` selects `esp32-scaffold`, the default dry build. It initializes only USB
+serial; all sensors report `missing` and all measurements are JSON `null`.
+It does not initialize sensor UART, I2C, ADC, heaters, or LCD.
 
-The `esp32dev` PlatformIO target is provisional, not identification of your board.
-`platformio.ini` pins the Espressif platform and ArduinoJson library. Neither
-PlatformIO nor arduino-cli was available in the authoring environment, so the
-firmware was **not compiled for ESP32**. Host-only tests cover the standalone
-sequence/timing/LCD guard, not ArduinoJson, USB behavior or electronics.
+`pio run -e esp32-sensors-verified` is an **opt-in compile target**, defining
+`NASEEM_VERIFIED_WIRING=1`. Its name is a required operator assertion before any
+future hardware execution, not evidence that wiring has been verified here.
+It explicitly enables PMS7003, BME280 and SGP30 adapters. All three per-sensor
+flags default to zero, independently of the global wiring flag:
+`NASEEM_ENABLE_BME280`, `NASEEM_ENABLE_PMS7003`, `NASEEM_ENABLE_SGP30`.
+Enabling any sensor without `NASEEM_VERIFIED_WIRING=1` is a compile error.
+For staged compile targets, use `esp32-bme-verified` (BME only), then
+`esp32-bme-pms-verified` (BME + PMS), then `esp32-sensors-verified` (all three).
+Pin defaults used by the adapters are centralized in `include/sensor_config.h`:
+`NASEEM_PMS_RX_PIN=16`, `NASEEM_PMS_TX_PIN=17`, `NASEEM_I2C_SDA_PIN=21`,
+`NASEEM_I2C_SCL_PIN=22`. Overrides do not establish electrical compatibility.
+A disabled sensor stays missing/null. UART2 initializes only for enabled PMS;
+Wire initializes only if BME or SGP is enabled. Do not treat these compile
+profiles as permission to connect or upload unverified hardware. It must not be uploaded until the
+actual board/module circuitry, supplies, logic levels and connections have been
+reviewed. No upload command or wiring procedure is provided.
 
-## Protocol
+The provisional `esp32dev` target is for the reported HiLetgo ESP-WROOM-32
+(ASIN B0718T232Z); the exact development-board revision remains unverified.
+Other reported parts: TopHomer MQ-7 B08QHN6QFD, Hailege GY-SGP30 B0CJY2QKLL,
+RELAND SUN BME280 labelled 5V B09WB3J9MC, OEM PMS7003 B0D2N3Y3MT. Marketplace
+identifiers do not verify electrical behavior or module authenticity.
 
-Device record example (boot ID varies; sequence begins at zero):
+PlatformIO configuration pins Espressif32 6.9.0 and ArduinoJson 6.21.5; the enabled
+build additionally uses Adafruit BME280 2.2.4 and Adafruit SGP30 2.0.3, with their
+normal transitive dependencies. No installations or ESP32 compiler build were
+performed for this revision. Host tests are not firmware compilation or hardware
+validation.
+
+## Optional adapters
+
+- **PMS7003:** UART2 RX16/TX17, 9600 8N1. Receive-only software, no wake/sleep or
+  mode commands; assumes the sensor is already in active reporting mode. Parser
+  storage is 32 bytes and each poll consumes at most 128 UART bytes. It checks
+  header, length=28, checksum, and nonzero sensor error byte. It uses atmospheric
+  PM1/PM2.5/PM10 offsets 10/12/14, not factory CF=1 outputs. It excludes the first
+  30 seconds after adapter startup; values older than 10 seconds become `error`
+  and `null`. No frames after warm-up means `missing`, malformed frames mean
+  `error` until a valid sample. A rejected length/checksum/error frame immediately invalidates prior data;
+  only a later valid frame clears that error. Noise/header mismatches never
+  refresh a prior sample, which expires at its normal 10-second TTL.
+- **BME280:** shared I2C SDA21/SCL22, tries addresses 0x76 then 0x77, requires chip
+  ID 0x60 (BMP280 substitutions are rejected). Live acknowledged chip-ID reads
+  bracket library measurements; the cached library ID alone is not trusted.
+  Reads about once per second and
+  verifies finite values in sensor operating ranges: -40..85 C, 0..100% RH,
+  30000..110000 Pa. Pressure is divided by 100 to report hPa. Failed validation
+  produces `error` with nulls; valid samples expire after 10 seconds.
+- **SGP30:** shared I2C, library address 0x58. Adafruit's driver performs protocol
+  CRC handling. Samples outside eCO2 400..60000 or TVOC 0..60000 are rejected
+  as errors, matching host sanity bounds. IAQ measurement runs about once per second independently of
+  five-second JSON records. First 15 seconds and the boundary sample are excluded
+  (earliest valid sample at 16 seconds). A failed measurement or cadence gap over
+  1500 ms invalidates readings, then reinitializes IAQ and restarts warm-up. No
+  catch-up bursts. The adapter is polled every loop and owns the only scheduler;
+  reinitialization restarts that scheduler after the initialization command ends. This is a conservative scheduling guard, not a manufacturer
+  specification for allowable jitter. TVOC is not a specific-gas measurement;
+  eCO2 is estimated CO2 equivalent, **not measured CO2**.
+- **Conditioning:** SGP30's startup gate is not calibration. Practical
+  stabilization/baseline conditioning can take hours; this implementation does
+  not persist/restore baselines and does not claim a calibrated baseline.
+  Humidity compensation is **not implemented**, so values are uncompensated.
+- **I2C:** shared Wire transaction timeout is 50 ms. The application contains no
+  long delay calls or unbounded receive loops. Sensor libraries use their own
+  bounded setup/conversion waits. Missing I2C sensors detected at boot are not
+  automatically rediscovered; investigate and restart only after verification.
+- **MQ-7:** remains disabled and `missing`, even in the enabled build. No ADC read,
+  heater control, CO ppm conversion, or CO-based classification is implemented.
+  GPIO34 is only a planned raw-input reference. Heater cycling circuitry, power,
+  analog conditioning, ADC calibration, burn-in and reference calibration must
+  be documented first. Never power the heater from an ESP32 GPIO.
+- **LCD:** physical writes remain unimplemented; `displayTick()` is a hook only.
+  The interface, controller, address and voltage remain unidentified. Internal
+  16-character display buffers are not evidence of actual LCD output.
+
+PMS7003 uses a nominal 5 V supply and 3.3 V UART in its manufacturer specification.
+The bare SGP30 has a 1.62–1.98 V supply; BME280 bare-chip limits are VDD 1.71–3.6 V
+and VDDIO 1.2–3.6 V. A breakout labelled “5V” does not prove safe I2C or ADC logic.
+**These facts are not validated wiring instructions for the listed modules.**
+
+## Version 1 serial protocol and local gates
+
+USB serial is 115200 baud, newline JSON only, on boot and about every five
+seconds. Sensor states are `missing`, `warming_up`, `ok`, `error`; readings are
+numbers only when their sensor is `ok`, otherwise JSON `null`. `source: hardware`
+identifies the device transport, not proof of valid measurements.
 
 ```json
 {"schema_version":1,"type":"reading","device_id":"esp32-naseem","boot_id":"0123456789abcdef0123456789abcdef","sequence":0,"uptime_ms":30,"source":"hardware","sensor_status":{"pms7003":"missing","sgp30":"missing","bme280":"missing","mq7":"missing"},"readings":{"pm1_ug_m3":null,"pm25_ug_m3":null,"pm10_ug_m3":null,"tvoc_ppb":null,"eco2_ppm":null,"temperature_c":null,"humidity_pct":null,"pressure_hpa":null,"mq7_adc_raw":null}}
 ```
 
-Expected host response, echoing this record's device ID, boot ID and sequence:
+Host responses echo the exact device ID, boot ID and latest sequence:
 
 ```json
 {"schema_version":1,"type":"status","device_id":"esp32-naseem","boot_id":"0123456789abcdef0123456789abcdef","sequence":0,"prototype_status":"UNKNOWN","data_quality":"MISSING","lcd_line_1":"UNKNOWN","lcd_line_2":"SENSORS MISSING"}
 ```
 
-Send one JSON object per line, no debug chatter. Both LCD strings must contain
-at most 16 printable ASCII characters. Future adapters may use sensor states
-`missing`, `warming_up`, `ok`, `error`; MQ-7 stays `missing` or `uncalibrated`
-until hardware verification. Host status enums are `NORMAL`, `WATCH`, `HIGH`,
-`UNKNOWN`; quality enums are `VALID`, `PARTIAL`, `WARMING_UP`, `MISSING`, `INVALID`.
-This build intentionally rejects non-missing classification. Sequence exhaustion
-stops records rather than wrapping. Emitted `uptime_ms` is a 64-bit monotonic
-accumulator updated each loop with unsigned 32-bit elapsed differences, so it
-continues increasing across the roughly 49.7-day `millis()` rollover. Sampling
-must continue at least once per 49.7 days; this scaffold samples every loop.
-Short-duration timer guards retain unsigned 32-bit elapsed arithmetic. Host
-tests cover two uptime rollovers as well as response-timer rollover. Boot IDs are random correlation
-values, not authentication; use only a trusted local serial host.
+Responses are limited to 511 bytes before newline. Overflow discards through the
+next newline. Invalid JSON/types/enums, non-printable ASCII, LCD strings exceeding
+16 characters, mismatched identities, duplicate or older sequences, and replies
+five seconds or more after transmission are rejected. Random boot IDs are
+correlation values, not authentication; use a trusted local serial host.
 
-## Before any hardware implementation
+The host owns illustrative thresholds and trend rules. Firmware independently
+rejects `NORMAL` and `VALID` because planned MQ-7 remains missing. `WATCH`/`HIGH`
+are accepted only when at least one pollutant sensor was valid in the record
+and **all** pollutant sensors valid in that record remain fresh locally, and response quality exactly matches the record's
+computed quality. The response does not identify which sensor triggered it, so
+losing either of two previously valid pollutant sensors revokes the display. `WARMING_UP` quality can coexist with a valid pollutant from
+another sensor. These statuses do not establish danger or safety; they are host
+prototype classifications. The internal display uses fixed prototype labels,
+not arbitrary host text. It returns to UNKNOWN if supporting data becomes stale
+or there is no fresh accepted host response for 15 seconds.
 
-Have a qualified person verify the exact board, sensor modules, supply and signal
-voltages, grounding, and manufacturer documentation. The intended software pin
-mapping is PMS7003 UART2 RX=16/TX=17, shared SGP30/BME280 I2C SDA=21/SCL=22,
-MQ-7 raw ADC=34. These are **reference constants, not verified wiring advice**;
-some ESP32 variants use these pins differently. LCD interface/address/controller
-and board/OS remain unknown. Never assume a 5 V module's output is ADC-safe.
+`uptime_ms` is a 64-bit monotonic accumulator updated each loop using unsigned
+32-bit elapsed differences. It continues across 49.7-day `millis()` rollovers,
+provided no sampling gap itself reaches 49.7 days. Timer guards remain unsigned
+32-bit. Sequence exhaustion stops transmission instead of reusing sequence IDs.
 
-To implement adapters in a later revision:
+## Verification
 
-1. PMS7003: bound UART reads and frame buffering, check header, length, checksum
-   and freshness; distinguish atmospheric from factory CF=1 outputs. Follow
-   manufacturer warm-up requirements and emit `null` until verified valid.
-2. SGP30: run IAQ measurement once per second, independent of JSON output. Its
-   first 15 seconds after initialization contain fixed startup values, not useful
-   measurements; mark `warming_up` and emit `null`. Passing 15 seconds alone is
-   not calibration. Follow manufacturer/library conditioning and baseline
-   guidance; practical stabilization can take hours and baseline handling needs
-   a documented plan. Reset validity after communication errors or cadence gaps.
-   eCO2 is an estimate, **not measured CO2**; TVOC is not a specific-gas diagnosis.
-3. BME280: verify identity/address, reject non-finite/out-of-range readings,
-   timestamp valid samples, and convert pressure from Pa to hPa explicitly.
-4. MQ-7: keep disabled. Verify heater cycling circuitry and timing, heater power,
-   analog voltage conditioning and ADC calibration, warm-up/burn-in and reference
-   calibration before exposing even diagnostic readings. Raw ADC is not CO ppm;
-   this project must not infer CO concentration or safe air from it. Never power
-   a sensor heater from an ESP32 GPIO.
-5. LCD: verify interface and voltage first, then implement bounded display writes
-   that pad both 16-character lines. Preserve local UNKNOWN/freshness gates.
-6. Add adapter-level hardware tests, error injection, stale-sample tests and
-   protocol integration tests before loosening the dry-build classification gate.
+Only host-side deterministic tests have run. They cover protocol timing,
+identity-independent sequence gates, duplicates, LCD bounds, two uptime
+rollovers; PMS headers/length/checksum/error flags, atmospheric fields, overlap
+resynchronization, freshness and 100,000 noise bytes; SGP startup/cadence/error, delayed-initialization recovery
+and rollover guards; BME chip/range/non-finite/pressure conversion checks; and
+local classification gates. They do **not** test ArduinoJson integration,
+Adafruit drivers, ESP32 compilation, serial devices, electrical correctness,
+sensor calibration, physical LCD output, or sensor accuracy.
 
-## Local checks (no upload)
-
-Run host-only guards from this directory with an existing C++ compiler:
+From this directory with an existing C++ compiler:
 
 ```sh
-g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/test_protocol_guard.cpp -o /tmp/naseem-protocol-test
-/tmp/naseem-protocol-test
+for test in protocol_guard sensor_core disabled_adapters; do
+  g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/test_${test}.cpp -o /tmp/naseem-${test}-test
+  /tmp/naseem-${test}-test
+done
+python3 test/test_sensor_config.py
 ```
 
-If PlatformIO is already installed, `pio run` performs a compile, not an upload.
-Review dependency downloads and the board selection first. No upload command or
-wiring procedure is included because the hardware has not been identified.
+Address/undefined-behavior sanitizer runs also passed with leak detection
+explicitly disabled because LeakSanitizer is unsupported under this environment's
+tracing. No memory-leak verification is claimed.
+
+Before hardware use: compile both targets in a suitable toolchain; verify wiring
+and board revision; add actual sensor-disconnect/corrupt-frame/bus-stall tests;
+check boot/reset and USB reconnect handling; measure timing and compare readings
+against references. Keep missing/invalid values null and retain local UNKNOWN
+and host-timeout gates.
+
+## Technical references
+
+- Plantower PMS7003 manufacturer manual (mirror):
+  https://empere.in/wp-content/uploads/2025/12/PTQ3015-2016-PMS7003-series-data-manua-English_V1.0K.pdf
+- Sensirion SGP30 datasheet:
+  https://sensirion.com/media/documents/984E0DD5/61644B8B/Sensirion_Gas_Sensors_Datasheet_SGP30.pdf
+- Bosch BME280 driver chip/register definitions:
+  https://github.com/boschsensortec/BME280_SensorAPI/blob/master/bme280_defs.h
+- Adafruit BME280 pressure-unit API:
+  https://adafruit.github.io/Adafruit_BME280_Library/html/class_adafruit___b_m_e280.html

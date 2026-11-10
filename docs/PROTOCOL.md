@@ -43,13 +43,13 @@ Use the PMS7003 atmospheric-environment mass concentration fields for ambient ob
 {"schema_version":1,"type":"status","device_id":"esp32-naseem","boot_id":"new-id-for-each-boot","sequence":0,"prototype_status":"UNKNOWN","data_quality":"MISSING","lcd_line_1":"PROTOTYPE:CHECK","lcd_line_2":"CHECK SENSORS"}
 ```
 
-Reply echoes device/boot/sequence; firmware must accept only the newest outstanding packet, once, within five seconds. Reject a mismatched device/boot/sequence and any invalid status or LCD text. LCD lines are printable ASCII, at most 16 characters. Do not display NORMAL if locally missing/warming/error sensors disagree with the host. Dry scaffold accepts only UNKNOWN/MISSING and renders its own non-reassuring text.
+Reply echoes device/boot/sequence; firmware must accept only the newest outstanding packet, once, within five seconds. Reject a mismatched device/boot/sequence and any invalid status or LCD text. LCD lines are printable ASCII, at most 16 characters. Do not display NORMAL if locally missing/warming/error sensors disagree with the host. The dry configuration permits only its locally consistent incomplete state and renders its own non-reassuring text. The optional adapters can support WATCH/HIGH only from fresh pollutant channels correlated to that record. NORMAL/VALID remain blocked because MQ-7 is disabled. Physical LCD writes are still unimplemented.
 
 Malformed frames without usable identity receive an UNKNOWN/INVALID reply with null identifiers. Firmware ignores these uncorrelated replies and independently times out. Complete but invalid packets may receive correlated UNKNOWN/INVALID responses; the dry scaffold's local missing-state gate remains conservative.
 
 ## Timing and storage
 
-SGP30 needs independent **one-second IAQ measurement cadence**. That is not the same as **five-second serial/database records**. The code has separate firmware scheduling hooks; actual acquisition is not implemented. Do not run SGP30 only when writing a record. Initial ~15-second algorithm defaults must not be interpreted as room readings. Further conditioning and baseline handling depend on the verified vendor instructions/module history.
+SGP30 needs independent **one-second IAQ measurement cadence**. That is not the same as **five-second serial/database records**. The optional SGP30 adapter has its own one-second scheduler; the default dry configuration does not acquire data. PMS7003 and BME280 acquisition are also optional, and MQ-7 remains disabled. Do not run SGP30 only when writing a record. Initial ~15-second algorithm defaults must not be interpreted as room readings. Further conditioning and baseline handling depend on the verified vendor instructions/module history.
 
 SQLite tables:
 - `runs`: start/end UTC, mode, software version, full rule configuration/hash, disclaimer.

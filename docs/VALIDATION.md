@@ -13,13 +13,16 @@ From project root:
 ```sh
 python -m unittest discover -s tests -v
 python -m compileall -q naseem tests
-c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/test/test_protocol_guard.cpp -o /tmp/naseem_protocol_guard_test
-/tmp/naseem_protocol_guard_test
+for test in protocol_guard sensor_core disabled_adapters; do
+  c++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/include firmware/test/test_${test}.cpp -o /tmp/naseem_${test}_test
+  /tmp/naseem_${test}_test
+done
+python firmware/test/test_sensor_config.py
 ```
 
 Python tests cover strict JSON, duplicated keys, non-finite/negative/bool/out-of-range values, missing/null fields, SGP30 startup, uncalibrated diagnostics, threshold boundaries, incomplete-data precedence, timestamp-normalized trends, resets/gaps, LCD/response bounds, out-of-order/duplicate and old-boot replay, source separation, SQLite persistence, CSV provenance/overwrite protection, bounded framing and recovery, malformed/truncated capture exit status, fake USB round trips, stale-stream logging and complete simulate/replay/export workflow.
 
-Firmware host C++ tests cover elapsed timing including unsigned clock wrap and two-rollover 64-bit uptime extension, expected response sequence, duplicate/stale rejection, host timeout and allowed display/status strings. They test isolated protocol helpers, **not the full Arduino build or real serial hardware**.
+Firmware host C++ tests also cover the portable PMS7003 frame parser and sensor-readiness helpers. They do not instantiate the Arduino sensor libraries. Protocol tests cover elapsed timing including unsigned clock wrap and two-rollover 64-bit uptime extension, expected response sequence, duplicate/stale rejection, host timeout and allowed display/status strings. They test isolated protocol helpers, **not the full Arduino build or real serial hardware**.
 
 ## Tested / not tested
 
@@ -27,8 +30,12 @@ Firmware host C++ tests cover elapsed timing including unsigned clock wrap and t
 - Python CLI synthetic mixed scenario: 72 labelled records, 5,000 ms virtual intervals; see example summary.
 - Actual USB serial device: **not tested**. The serial adapter was exercised using a fake serial object.
 - ESP32 toolchain compilation: **not run**; PlatformIO/arduino-cli are not installed here.
-- ESP32 flashing, GPIO power, sensor drivers, LCD output, sensor accuracy, calibration: **not performed**.
+- ESP32 flashing, GPIO power, physical sensor-driver behavior, LCD output, sensor accuracy, calibration: **not performed**.
 - Real-room experiment or comparison against reference instrument: **not performed**.
 - Official AQI, CO detection reliability, health/safety efficacy, model accuracy: **not established**.
 
 The next defensible project result is a verified hardware integration log, not a claim of experimental success based on the synthetic files.
+
+## Version 0.2 changes
+
+Supplied product references informed optional PMS7003, SGP30 and BME280 adapters. Manufacturer requirements are recorded in `SENSOR_SOURCES.md`. Acquisition remains disabled by default, and MQ-7/LCD implementation remains deferred. No PlatformIO/Arduino installation or dependency download was performed for this update; ESP32 compilation remains explicitly unverified. Python contract tests additionally cover three-sensor readiness with MQ-7 absent, SGP30 mid-run reinitialization and software-version provenance.

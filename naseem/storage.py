@@ -1,11 +1,11 @@
 """Transactional local data journal with provenance and error records."""
 import csv
-from dataclasses import asdict
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
 import uuid
+from . import __version__
 from .config import config_json, config_hash
 from .model import BOUNDS, SENSORS
 
@@ -54,7 +54,7 @@ class Journal:
         self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         self.run_id = uuid.uuid4().hex
         self.connection.execute("INSERT INTO runs VALUES (?, ?, NULL, ?, ?, ?, ?, ?)",
-            (self.run_id, utc_now(), mode, config_hash(config), config_json(config), "0.1.0",
+            (self.run_id, utc_now(), mode, config_hash(config), config_json(config), __version__,
              "Academic prototype; thresholds illustrative; no official AQI or CO safety inference; synthetic records are not observations"))
         self.connection.commit()
 
