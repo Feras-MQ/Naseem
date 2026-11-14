@@ -30,7 +30,7 @@ Firmware host C++ tests also cover the portable PMS7003 frame parser and sensor-
 - Python and host protocol tests: see `TEST_RESULTS.txt` for exact final run.
 - Python CLI synthetic mixed scenario: 72 labelled records, 5,000 ms virtual intervals; see example summary.
 - Actual USB serial device: **not tested**. In addition to fake-object unit tests, real pyserial ran through an OS pseudo-terminal; fragmented input, duplicate rejection, recovery, bounded responses and SQLite persistence passed with emulated packets.
-- ESP32 toolchain compilation: **all six profiles passed**: dry, BME, BME+PMS, all three sensors, display-only fixture, and sensors+display fixture. See `TEST_RESULTS.txt` for the exact build summary. This is cross-compilation, not physical execution.
+- ESP32 toolchain compilation: **all six profiles passed**: dry, BME, BME+PMS, all three sensors, display-only fixture, and sensors+display fixture. The version-0.3 hosted run linked below contains the exact build summary; firmware source is unchanged in 0.4. This is cross-compilation, not physical execution.
 - ESP32 flashing, GPIO power, physical sensor-driver behavior, LCD output, sensor accuracy, calibration: **not performed**.
 - Real-room experiment or comparison against reference instrument: **not performed**.
 - Official AQI, CO detection reliability, health/safety efficacy, model accuracy: **not established**.
@@ -59,3 +59,24 @@ The test log states the final build results and limits explicitly. Hardware
 identity, power, wiring, physical drivers, timing under real IO and calibration
 remain unverified. A photo/order review is needed before selecting a display
 driver or enabling physical acquisition. MQ-7 remains disabled.
+
+## Version 0.4 readiness checks
+
+- 85 Python tests pass locally with pyserial, including virtual serial recovery.
+- Database checks cover zero-run/idempotent initialization, atomic rollback,
+  preserved foreign/corrupt/future schemas, named-column provenance, read-only
+  bounded history, unknown runs, foreign-key integrity and committed WAL backups.
+- New demos contain exactly 72 matching database/JSONL/CSV records and are isolated;
+  overwritten output is refused, partial output is marked, HTML text is escaped.
+- Preflight never opens/enumerates a device; port listing only enumerates metadata.
+- Launcher tests use actual subprocesses outside the checkout and in Arabic/spaces
+  paths, including CP1252 redirected output. USB setup refuses foreign/shared
+  environments and Windows junctions; installation tests mock package downloads.
+- Four strict native C++ suites and eleven configuration checks pass locally.
+- The previous published 0.3 commit passed both host and all six ESP32 builds in
+  [GitHub CI](https://github.com/Feras-MQ/Naseem/actions/runs/43589608528).
+- New CI adds Ubuntu/Python 3.10 and Windows/Python 3.12 operator checks. Consult
+  the 0.4 PR checks for their actual result; adding a job is not a pass claim.
+- Offline report content/output was tested, but visual browser inspection was
+  blocked here: local Chromium process sockets were denied, and the cloud browser
+  blocks file URLs. No screenshot-based visual QA is claimed.

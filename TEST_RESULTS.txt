@@ -1,51 +1,34 @@
-NASEEM 0.3.0 — VERIFIED SOFTWARE RESULTS
+NASEEM 0.4.0 — SOFTWARE READINESS RESULTS
 Date: 2026-11-14
-Repository base: 3c4e4d43b57ebedb44211f699428255bf47dd557
-Environment: cloud Linux, Python 3.12, GCC host tests, no physical device.
-Command: python scripts/check.py --firmware
-PlatformIO Core: 6.1.18; Espressif32 platform: 6.9.0
-Arduino ESP32 framework: 3.20017.241212+sha.dcc1105b (Arduino 2.0.17)
-Xtensa compiler: 8.4.0+2021r2-patch5
-Direct libraries: ArduinoJson 6.21.5, BME280 2.2.4, SGP30 2.0.3,
-ILI9341 1.7.0, GFX 1.12.4. Resolved BusIO 1.17.4, Unified Sensor 1.1.15.
+Parent: published 2c1bd6c44cc362207ffcfa64231901acba35ed35 (PR #1)
+Environment: cloud Linux, Python 3.12, no physical device.
+Command: python scripts/check.py
 
-RESULTS
-- 43 Python tests PASS, including a real pyserial virtual-port recovery test.
-- 4 native C++ suites PASS under -std=c++11 -Wall -Wextra -Werror.
-- 8 display configuration tests PASS.
-- 3 sensor configuration tests PASS.
-- 6 ESP32 build profiles PASS (no upload).
-- git diff whitespace check PASS.
+VERIFIED LOCALLY
+- 85 Python tests passed, including real pyserial over an OS virtual port.
+- 4 native C++ suites passed under -std=c++11 -Wall -Wextra -Werror.
+- 8 display configuration and 3 sensor configuration tests passed.
+- Demo: 72 accepted synthetic packets, 0 rejected, matching JSONL/SQLite/CSV.
+- Database initialization: zero artificial runs, idempotent, atomic on failure.
+- Foreign/corrupt/future/partial databases refused without modification.
+- Read-only history; missing paths never silently create databases.
+- SQLite backup includes committed WAL data while writer stays open.
+- Existing backup/export/demo destinations preserved.
+- Source launchers work from other directories and Arabic/spaces paths,
+  including forced CP1252 redirected output. USB installation tests are mocked.
 
-ADDITIONAL CHECKS
-- Source CLI: 72 synthetic mixed records accepted, 0 rejected; 72 CSV records.
-  Status counts: UNKNOWN 12, NORMAL 45, WATCH 9, HIGH 6.
-- Built Python wheel installed without dependencies in an isolated venv outside
-  the source checkout; 72-record synthetic demo passed with the same counts.
-- SCons upload guard: upload, uploadfs, uploadfsota and program rejected;
-  buildprog and default compile target allowed. No device discovery/upload ran.
-- Display rendering was also checked with address/undefined-behavior sanitizers;
-  leak detection was disabled in this environment. No leak-test claim.
-- Timer tests include sticky expiry and a complete simulated 32-bit SGP clock cycle.
+HOSTED VERIFICATION
+Previous published 0.3 commit passed host tests and all six ESP32 builds:
+https://github.com/Feras-MQ/Naseem/actions/runs/43589608528
+The 0.4 change does not modify firmware source. Expanded workflow includes
+Ubuntu/Python 3.10 and Windows/Python 3.12 operator tests. See PR #1's current
+checks for the result on this revision; no future CI pass is assumed here.
 
 LIMITS
-Cross-compilation checks compatibility, not execution on an ESP32. Virtual serial
-packets are test fixtures, not measurements. Delivered screen controller/pins and
-soldered-sensor identity remain unknown. No wiring, flashing, sensor accuracy,
-physical display output, real timing, calibration or exposure experiment tested.
-MQ-7 remains disabled. Default firmware initializes no sensors/display.
-GitHub Actions workflow is prepared; no hosted CI pass is claimed.
-The linked GitHub integration denied branch creation with 403 Resource not
-accessible by integration. Changes are local; no remote branch, merge or deploy.
-
-FINAL BUILD SUMMARY
-Environment                          Status    Duration
------------------------------------  --------  ------------
-esp32-scaffold                       SUCCESS   00:00:05.987
-esp32-sensors-verified               SUCCESS   00:00:06.112
-esp32-bme-verified                   SUCCESS   00:00:05.958
-esp32-bme-pms-verified               SUCCESS   00:00:05.967
-esp32-ili9341-compile-check          SUCCESS   00:06:55.701
-esp32-sensors-ili9341-compile-check  SUCCESS   00:02:32.480
-========================= 6 succeeded in 00:09:52.205 =========================
-Software checks passed. Physical wiring, sensors and display are not verified.
+No wiring, flashing, physical sensor/display, measurement accuracy, real IO
+timing or calibration tested. Exact screen controller/pinout and soldered-sensor
+identity remain unknown. MQ-7 stays disabled and its heater driver unimplemented.
+Default firmware initializes no sensors or display. Examples are synthetic.
+HTML output/content tests passed; actual visual browser QA was blocked by the
+executor's Chromium socket restriction and cloud browser file-URL policy.
+No code merged or deployed. No device settings or global packages changed.

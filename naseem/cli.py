@@ -1,4 +1,4 @@
-"""Terminal workflows: simulate, replay, USB serial, and CSV export."""
+"""Local setup, demonstration, recording, inspection and export workflows."""
 import argparse
 from collections import Counter
 import json
@@ -10,7 +10,7 @@ from .config import load_config
 from .model import ValidationError
 from .service import Processor, LineFramer
 from .simulate import make_packet, SCENARIOS
-from .storage import Journal, export_csv
+from .storage import Journal, export_csv, initialize_database, inspect_database, backup_database
 from .transport import run_serial
 
 NOTICE = "Academic prototype. Rules are illustrative, not official AQI or safety limits. MQ-7 is raw only; eCO2 is estimated, not measured CO2."
@@ -29,6 +29,19 @@ def positive_int(value):
 def build_parser():
     parser = argparse.ArgumentParser(description=NOTICE)
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("doctor", help="Check local software without opening any device")
+    commands.add_parser("ports", help="List serial-port metadata; never connect automatically")
+    demo = commands.add_parser("demo", help="Create a new folder with a complete synthetic demo and offline report")
+    demo.add_argument("--output", required=True, type=Path, help="New directory; existing directories are never reused")
+    init = commands.add_parser("init-db", help="Prepare an empty journal without inventing a recording session")
+    init.add_argument("--db", required=True, type=Path)
+    inspect = commands.add_parser("inspect", help="Read stored history and integrity; not a live assessment")
+    inspect.add_argument("--db", required=True, type=Path)
+    inspect.add_argument("--run-id")
+    inspect.add_argument("--limit", type=positive_int, default=10, help="Most recent entries per list (1-100)")
+    backup = commands.add_parser("backup", help="Take a consistent SQLite snapshot into a new file")
+    backup.add_argument("--db", required=True, type=Path)
+    backup.add_argument("--output", required=True, type=Path)
     sim = commands.add_parser("simulate", help="Generate explicitly synthetic classroom records")
     sim.add_argument("--scenario", choices=SCENARIOS, default="mixed")
     sim.add_argument("--samples", type=positive_int, default=72)
@@ -54,6 +67,24 @@ def build_parser():
 def main(argv=None):
     args = build_parser().parse_args(argv)
     try:
+        if args.command in ("doctor", "ports"):
+            from .diagnostics import doctor, list_ports
+            report = doctor() if args.command == "doctor" else {"ports": list_ports(), "opened_ports": 0, "hardware_verified": False}
+            print(json.dumps(report, indent=2, ensure_ascii=True))
+            return 2 if args.command == "doctor" and not report["software_ready"] else 0
+        if args.command == "demo":
+            from .demo import create_demo
+            print(json.dumps(create_demo(args.output), indent=2, ensure_ascii=True))
+            return 0
+        if args.command == "init-db":
+            print(json.dumps(initialize_database(args.db), indent=2))
+            return 0
+        if args.command == "inspect":
+            print(json.dumps(inspect_database(args.db, args.run_id, args.limit), indent=2, ensure_ascii=True))
+            return 0
+        if args.command == "backup":
+            print(json.dumps(backup_database(args.db, args.output), indent=2))
+            return 0
         if args.command == "export":
             count = export_csv(args.db, args.csv, args.run_id)
             print(json.dumps({"exported_records": count, "csv": str(args.csv)}))
