@@ -23,6 +23,13 @@ int main() {
   assert(!guard.mayAccept(0, 5099)); // Duplicate cannot refresh host liveness.
   assert(!guard.timedOut(20098));
   assert(guard.timedOut(20099));
+  // Liveness expiry is sticky even when the clock later repeats old values.
+  assert(guard.timedOut(UINT32_MAX));
+  assert(guard.timedOut(5100));
+  guard.onSent(10, 6000);
+  assert(guard.mayAccept(10, 6001));
+  guard.onAccepted(6001);
+  assert(!guard.timedOut(6002)); // New accepted reply restores liveness.
   guard.onSent(1, 5100);
   assert(!guard.mayAccept(0, 5101));
   assert(guard.mayAccept(1, 5101));

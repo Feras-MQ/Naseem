@@ -1,81 +1,51 @@
-Naseem version 0.2.0 local validation
-Executor clock UTC: 2026-11-10 10:31:02
-Python 3.12.14
+NASEEM 0.3.0 — VERIFIED SOFTWARE RESULTS
+Date: 2026-11-14
+Repository base: 3c4e4d43b57ebedb44211f699428255bf47dd557
+Environment: cloud Linux, Python 3.12, GCC host tests, no physical device.
+Command: python scripts/check.py --firmware
+PlatformIO Core: 6.1.18; Espressif32 platform: 6.9.0
+Arduino ESP32 framework: 3.20017.241212+sha.dcc1105b (Arduino 2.0.17)
+Xtensa compiler: 8.4.0+2021r2-patch5
+Direct libraries: ArduinoJson 6.21.5, BME280 2.2.4, SGP30 2.0.3,
+ILI9341 1.7.0, GFX 1.12.4. Resolved BusIO 1.17.4, Unified Sensor 1.1.15.
 
-Python application tests:
-test_bad_replay_nonzero (test_naseem.CliTests.test_bad_replay_nonzero) ... ok
-test_demo_replay_export (test_naseem.CliTests.test_demo_replay_export) ... ok
-test_existing_export_protected (test_naseem.CliTests.test_existing_export_protected) ... ok
-test_default_and_hash (test_naseem.ConfigTests.test_default_and_hash) ... ok
-test_invalid_configs (test_naseem.ConfigTests.test_invalid_configs) ... ok
-test_journal_records_current_software_version (test_naseem.EnabledHardwareContractTests.test_journal_records_current_software_version) ... ok
-test_midrun_sgp_reinitialization_excludes_its_values (test_naseem.EnabledHardwareContractTests.test_midrun_sgp_reinitialization_excludes_its_values) ... ok
-test_three_ready_sensors_still_cannot_claim_normal_without_mq7 (test_naseem.EnabledHardwareContractTests.test_three_ready_sensors_still_cannot_claim_normal_without_mq7) ... ok
-test_incomplete_final_frame (test_naseem.FramingTests.test_incomplete_final_frame) ... ok
-test_overflow_recovers (test_naseem.FramingTests.test_overflow_recovers) ... ok
-test_split_crlf_and_multiple_lines (test_naseem.FramingTests.test_split_crlf_and_multiple_lines) ... ok
-test_database_not_overwritten_by_export (test_naseem.JournalTests.test_database_not_overwritten_by_export) ... ok
-test_duplicate_and_out_of_order_rejected (test_naseem.JournalTests.test_duplicate_and_out_of_order_rejected) ... ok
-test_hardware_mode_refuses_simulation (test_naseem.JournalTests.test_hardware_mode_refuses_simulation) ... ok
-test_invalid_persists_and_resets_history (test_naseem.JournalTests.test_invalid_persists_and_resets_history) ... ok
-test_mixed_device_or_source_rejected (test_naseem.JournalTests.test_mixed_device_or_source_rejected) ... ok
-test_persistence_export_provenance (test_naseem.JournalTests.test_persistence_export_provenance) ... ok
-test_reboot_accepts_and_old_boot_rejects (test_naseem.JournalTests.test_reboot_accepts_and_old_boot_rejects) ... ok
-test_huge_configuration_number_is_rejected (test_naseem.NumericRobustnessTests.test_huge_configuration_number_is_rejected) ... ok
-test_huge_integer_reading_is_rejected_without_crashing (test_naseem.NumericRobustnessTests.test_huge_integer_reading_is_rejected_without_crashing) ... ok
-test_any_missing_or_warming_never_normal (test_naseem.RuleTests.test_any_missing_or_warming_never_normal) ... ok
-test_gap_and_reboot_clear_history (test_naseem.RuleTests.test_gap_and_reboot_clear_history) ... ok
-test_lcd_and_wire_bounded (test_naseem.RuleTests.test_lcd_and_wire_bounded) ... ok
-test_mq_raw_not_co_rule (test_naseem.RuleTests.test_mq_raw_not_co_rule) ... ok
-test_normal_is_not_safety_claim (test_naseem.RuleTests.test_normal_is_not_safety_claim) ... ok
-test_partial_does_not_hide_high (test_naseem.RuleTests.test_partial_does_not_hide_high) ... ok
-test_rising_below_threshold (test_naseem.RuleTests.test_rising_below_threshold) ... ok
-test_sensor_failure_clears_its_history (test_naseem.RuleTests.test_sensor_failure_clears_its_history) ... ok
-test_threshold_boundaries (test_naseem.RuleTests.test_threshold_boundaries) ... ok
-test_large_uptime_retains_slope_precision (test_naseem.SerialAdapterTests.test_large_uptime_retains_slope_precision) ... ok
-test_mock_stale_stream_logged (test_naseem.SerialAdapterTests.test_mock_stale_stream_logged) ... ok
-test_mock_usb_roundtrip_and_compact_response (test_naseem.SerialAdapterTests.test_mock_usb_roundtrip_and_compact_response) ... ok
-test_all_warmup_scenarios_parse (test_naseem.ValidationTests.test_all_warmup_scenarios_parse) ... ok
-test_early_sgp_ok_rejected (test_naseem.ValidationTests.test_early_sgp_ok_rejected) ... ok
-test_invalid_values (test_naseem.ValidationTests.test_invalid_values) ... ok
-test_malformed_and_oversized (test_naseem.ValidationTests.test_malformed_and_oversized) ... ok
-test_missing_nulls_accepted (test_naseem.ValidationTests.test_missing_nulls_accepted) ... ok
-test_no_co_ppm_field (test_naseem.ValidationTests.test_no_co_ppm_field) ... ok
-test_sensor_status_mismatch (test_naseem.ValidationTests.test_sensor_status_mismatch) ... ok
-test_strict_metadata (test_naseem.ValidationTests.test_strict_metadata) ... ok
-test_valid (test_naseem.ValidationTests.test_valid) ... ok
+RESULTS
+- 43 Python tests PASS, including a real pyserial virtual-port recovery test.
+- 4 native C++ suites PASS under -std=c++11 -Wall -Wextra -Werror.
+- 8 display configuration tests PASS.
+- 3 sensor configuration tests PASS.
+- 6 ESP32 build profiles PASS (no upload).
+- git diff whitespace check PASS.
 
-----------------------------------------------------------------------
-Ran 41 tests in 0.084s
+ADDITIONAL CHECKS
+- Source CLI: 72 synthetic mixed records accepted, 0 rejected; 72 CSV records.
+  Status counts: UNKNOWN 12, NORMAL 45, WATCH 9, HIGH 6.
+- Built Python wheel installed without dependencies in an isolated venv outside
+  the source checkout; 72-record synthetic demo passed with the same counts.
+- SCons upload guard: upload, uploadfs, uploadfsota and program rejected;
+  buildprog and default compile target allowed. No device discovery/upload ran.
+- Display rendering was also checked with address/undefined-behavior sanitizers;
+  leak detection was disabled in this environment. No leak-test claim.
+- Timer tests include sticky expiry and a complete simulated 32-bit SGP clock cycle.
 
-OK
+LIMITS
+Cross-compilation checks compatibility, not execution on an ESP32. Virtual serial
+packets are test fixtures, not measurements. Delivered screen controller/pins and
+soldered-sensor identity remain unknown. No wiring, flashing, sensor accuracy,
+physical display output, real timing, calibration or exposure experiment tested.
+MQ-7 remains disabled. Default firmware initializes no sensors/display.
+GitHub Actions workflow is prepared; no hosted CI pass is claimed.
+The linked GitHub integration denied branch creation with 403 Resource not
+accessible by integration. Changes are local; no remote branch, merge or deploy.
 
-Python bytecode:
-PASS
-
-Firmware configuration preprocessor tests (host compiler only):
-test_default_and_verified_combinations (__main__.SensorConfig.test_default_and_verified_combinations) ... ok
-test_non_boolean_flags_rejected (__main__.SensorConfig.test_non_boolean_flags_rejected) ... ok
-test_unverified_enables_rejected (__main__.SensorConfig.test_unverified_enables_rejected) ... ok
-
-----------------------------------------------------------------------
-Ran 3 tests in 0.123s
-
-OK
-
-Firmware host C++ suites (not ESP32 compilation):
-Protocol guard assertions passed (host C++; not ESP32 or hardware tests).
-Sensor-core assertions passed (host-only; no ESP32/hardware test).
-Disabled adapter assertions passed (host-only, stub clock).
-
-Address/undefined-behavior sanitizer host suites (leak detection disabled):
-Protocol guard assertions passed (host C++; not ESP32 or hardware tests).
-Sensor-core assertions passed (host-only; no ESP32/hardware test).
-Disabled adapter assertions passed (host-only, stub clock).
-
-Python wheel version 0.2.0 built successfully with --no-build-isolation --no-deps; no package installation.
-Not run: ESP32 compilation, real USB, sensor/LCD/ADC hardware, wiring, flashing, calibration, physical experiments.
-No toolchain or sensor-library downloads/installations; no external upload or repository push for this update.
-
-Synthetic demonstration only:
-{"run_id": "b9fb4724d6e74664904ed39b7a5d772b", "mode": "simulate", "accepted": 72, "rejected": 0, "status_counts": {"UNKNOWN": 12, "NORMAL": 45, "WATCH": 9, "HIGH": 6}, "db": "examples/SYNTHETIC_demo.sqlite3"}
+FINAL BUILD SUMMARY
+Environment                          Status    Duration
+-----------------------------------  --------  ------------
+esp32-scaffold                       SUCCESS   00:00:05.987
+esp32-sensors-verified               SUCCESS   00:00:06.112
+esp32-bme-verified                   SUCCESS   00:00:05.958
+esp32-bme-pms-verified               SUCCESS   00:00:05.967
+esp32-ili9341-compile-check          SUCCESS   00:06:55.701
+esp32-sensors-ili9341-compile-check  SUCCESS   00:02:32.480
+========================= 6 succeeded in 00:09:52.205 =========================
+Software checks passed. Physical wiring, sensors and display are not verified.

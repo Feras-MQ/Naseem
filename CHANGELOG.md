@@ -1,5 +1,15 @@
 # Changes
 
+## 0.3.0: Display candidate and repeatable verification
+
+- Added disabled-by-default ILI9341 SPI candidate output, with explicit wiring/pin gates and padded changed-row rendering. The purchased 2.8-inch screen is still unidentified.
+- Added two compile-only display environments with upload guards; default sensor and display behavior stays dry.
+- Fixed escaped duplicate JSON keys crashing SQLite error logging; malformed input is rejected and the next valid packet can recover.
+- Latched sensor warm-up completion and sensor/host expiry so stale state does not revive at a 32-bit timer wrap.
+- Added real pyserial testing through an operating-system virtual port, a single check runner and CI build/test definitions. No physical serial device was used.
+- Updated the hardware inventory and added a concise Arabic/English getting-started guide.
+- See `TEST_RESULTS.txt` and `docs/VALIDATION.md` for the final verification record.
+
 ## 0.2.0: Optional sensor integration
 
 - Added supplied hardware inventory and verified sensor-level technical references.

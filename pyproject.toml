@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "naseem-prototype"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local academic indoor-air indicator prototype, not a safety instrument"
 requires-python = ">=3.10"
 dependencies = []

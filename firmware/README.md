@@ -36,9 +36,9 @@ identifiers do not verify electrical behavior or module authenticity.
 
 PlatformIO configuration pins Espressif32 6.9.0 and ArduinoJson 6.21.5; the enabled
 build additionally uses Adafruit BME280 2.2.4 and Adafruit SGP30 2.0.3, with their
-normal transitive dependencies. No installations or ESP32 compiler build were
-performed for this revision. Host tests are not firmware compilation or hardware
-validation.
+normal transitive dependencies. The optional display candidate pins ILI9341 1.7.0
+and GFX 1.12.4. See `../docs/VALIDATION.md` and `../TEST_RESULTS.txt` for the
+current compiler/test evidence. Compilation is separate from hardware validation.
 
 ## Optional adapters
 
@@ -82,9 +82,12 @@ validation.
   GPIO34 is only a planned raw-input reference. Heater cycling circuitry, power,
   analog conditioning, ADC calibration, burn-in and reference calibration must
   be documented first. Never power the heater from an ESP32 GPIO.
-- **LCD:** physical writes remain unimplemented; `displayTick()` is a hook only.
-  The interface, controller, address and voltage remain unidentified. Internal
-  16-character display buffers are not evidence of actual LCD output.
+- **Display:** `displayTick()` now uses an optional ILI9341 SPI adapter. The default
+  adapter is a no-op. A confirmed ILI9341 requires explicit verified-display and
+  pin definitions; the purchased 2.8-inch unit is not identified yet. Two compile
+  fixtures exercise display-only and display-plus-sensors integration, with
+  PlatformIO uploads blocked. See [display details](../docs/DISPLAY.md). No actual
+  screen output, touch, SD or backlight control has been tested.
 
 PMS7003 uses a nominal 5 V supply and 3.3 V UART in its manufacturer specification.
 The bare SGP30 has a 1.62–1.98 V supply; BME280 bare-chip limits are VDD 1.71–3.6 V
@@ -128,34 +131,40 @@ or there is no fresh accepted host response for 15 seconds.
 `uptime_ms` is a 64-bit monotonic accumulator updated each loop using unsigned
 32-bit elapsed differences. It continues across 49.7-day `millis()` rollovers,
 provided no sampling gap itself reaches 49.7 days. Timer guards remain unsigned
-32-bit. Sequence exhaustion stops transmission instead of reusing sequence IDs.
+32-bit. PMS/SGP warm-up completion and PMS/host expiry are latched during
+regular polling so an old timestamp cannot revive data or restart warm-up after
+a complete timer cycle. Sequence exhaustion stops transmission instead of reusing sequence IDs.
 
 ## Verification
 
-Only host-side deterministic tests have run. They cover protocol timing,
+Host-side deterministic tests cover protocol timing,
 identity-independent sequence gates, duplicates, LCD bounds, two uptime
 rollovers; PMS headers/length/checksum/error flags, atmospheric fields, overlap
 resynchronization, freshness and 100,000 noise bytes; SGP startup/cadence/error, delayed-initialization recovery
 and rollover guards; BME chip/range/non-finite/pressure conversion checks; and
-local classification gates. They do **not** test ArduinoJson integration,
-Adafruit drivers, ESP32 compilation, serial devices, electrical correctness,
-sensor calibration, physical LCD output, or sensor accuracy.
+local classification gates, display row rendering and repeated timer values
+after a full 32-bit clock cycle. A virtual-port test exercises real pyserial
+framing and rejection/recovery with emulated packets. The separate ESP32 build
+checks library compatibility; it is not execution on the board. These checks
+do **not** validate electrical correctness, physical drivers, sensor calibration,
+physical display output or sensor accuracy.
 
 From this directory with an existing C++ compiler:
 
 ```sh
-for test in protocol_guard sensor_core disabled_adapters; do
+for test in protocol_guard sensor_core disabled_adapters display_core; do
   g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/test_${test}.cpp -o /tmp/naseem-${test}-test
   /tmp/naseem-${test}-test
 done
 python3 test/test_sensor_config.py
+python3 test/test_display_config.py
 ```
 
 Address/undefined-behavior sanitizer runs also passed with leak detection
 explicitly disabled because LeakSanitizer is unsupported under this environment's
 tracing. No memory-leak verification is claimed.
 
-Before hardware use: compile both targets in a suitable toolchain; verify wiring
+Before hardware use: repeat the six-profile build in a suitable toolchain; verify wiring
 and board revision; add actual sensor-disconnect/corrupt-frame/bus-stall tests;
 check boot/reset and USB reconnect handling; measure timing and compare readings
 against references. Keep missing/invalid values null and retain local UNKNOWN

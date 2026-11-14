@@ -6,12 +6,21 @@
 namespace naseem {
 constexpr uint32_t kSensorFreshMs = 10000;
 constexpr uint32_t kPmsWarmMs = 30000;
+struct WarmupGate {
+  uint32_t startedAt = 0;
+  bool complete = false;
+  void reset(uint32_t now) { startedAt = now; complete = false; }
+  void poll(uint32_t now, uint32_t duration) {
+    // Completion survives clock wrap; only an explicit restart clears it.
+    if (!complete && elapsed(now, startedAt, duration)) complete = true;
+  }
+};
 struct PmsParser {
   uint8_t bytes[32] = {};
   unsigned used = 0;
   uint16_t pm1 = 0, pm25 = 0, pm10 = 0;
   uint32_t receivedAt = 0;
-  bool received = false, latestError = false;
+  bool received = false, latestError = false, expired = true;
   unsigned rejected = 0;
   static uint16_t word(const uint8_t* p) { return (uint16_t(p[0]) << 8) | p[1]; }
   void shift() { memmove(bytes, bytes + 1, --used); }
@@ -27,11 +36,16 @@ struct PmsParser {
       ++rejected; latestError = true; shift(); return false;
     }
     pm1 = word(bytes + 10); pm25 = word(bytes + 12); pm10 = word(bytes + 14);
-    receivedAt = now; received = true; latestError = false; used = 0;
+    receivedAt = now; received = true; latestError = false; expired = false; used = 0;
     return true;
   }
+  void expire(uint32_t now) {
+    // Called by the adapter every loop, even with no incoming bytes. Expiry
+    // persists across full clock cycles until a new valid frame arrives.
+    if (received && elapsed(now, receivedAt, kSensorFreshMs)) expired = true;
+  }
   bool fresh(uint32_t now) const {
-    return received && !latestError && !elapsed(now, receivedAt, kSensorFreshMs);
+    return received && !latestError && !expired && !elapsed(now, receivedAt, kSensorFreshMs);
   }
 };
 inline bool allSupportFresh(uint8_t sentMask, uint8_t currentMask) {
@@ -55,9 +69,9 @@ struct SgpSchedule {
 };
 struct SgpReadiness {
   uint32_t initializedAt = 0, previousSample = 0, validAt = 0;
-  bool initialized = false, valid = false;
+  bool initialized = false, valid = false, warmedUp = false;
   void reset(uint32_t now) {
-    initializedAt = previousSample = now; initialized = true; valid = false;
+    initializedAt = previousSample = now; initialized = true; valid = warmedUp = false;
   }
   bool missed(uint32_t now) const {
     return initialized && elapsed(now, previousSample, 1501);
@@ -67,7 +81,9 @@ struct SgpReadiness {
     if (!elapsed(now, previousSample, 1000)) return false;
     previousSample = now;
     // Discard the first 15 seconds, plus the boundary sample conservatively.
-    valid = elapsed(now, initializedAt, 16000);
+    // Continuous operation must not repeat startup when millis() wraps.
+    warmedUp = warmedUp || elapsed(now, initializedAt, 16000);
+    valid = warmedUp;
     if (valid) validAt = now;
     return valid;
   }
