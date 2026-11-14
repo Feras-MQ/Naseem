@@ -1,3 +1,4 @@
+from contextlib import closing
 import copy
 import csv
 import io
@@ -200,6 +201,21 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(self.processor.process(json.dumps(packet(13)))["trends"], {})
         self.assertEqual(self.journal.connection.execute("SELECT count(*) FROM events").fetchone()[0], 1)
 
+    def test_duplicate_surrogate_key_is_logged_and_stream_recovers(self):
+        # Escaped lone surrogates are legal input to Python's JSON decoder but
+        # cannot be encoded by SQLite. Error messages must escape the key.
+        malformed = json.dumps(packet())[:-1] + r',"\ud800":1,"\ud800":2}'
+        result = self.processor.process(malformed.encode("ascii"))
+        self.assertEqual(result["data_quality"], "INVALID")
+        self.assertEqual(self.processor.rejected, 1)
+        event = self.journal.connection.execute("SELECT kind, message FROM events").fetchone()
+        self.assertEqual(event[0], "invalid_record")
+        self.assertIn(r"\ud800", event[1])
+        self.assertNotIn(chr(0xD800), event[1])
+        # The next valid packet must still be accepted in the same session.
+        self.assertEqual(self.processor.process(json.dumps(packet()))["data_quality"], "VALID")
+        self.assertEqual(self.processor.accepted, 1)
+
     def test_mixed_device_or_source_rejected(self):
         self.processor.process(json.dumps(packet()))
         for key, value in (("device_id", "other"), ("source", "hardware")):
@@ -233,7 +249,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             temp = Path(temp); db = temp / "demo.sqlite3"; packets = temp / "synthetic.jsonl"
             self.assertEqual(main(["simulate", "--db", str(db), "--samples", "72", "--jsonl", str(packets)]), 0)
-            with sqlite3.connect(db) as con:
+            with closing(sqlite3.connect(db)) as con, con:
                 self.assertEqual(con.execute("SELECT count(*) FROM records").fetchone()[0], 72)
                 statuses = {r[0] for r in con.execute("SELECT DISTINCT prototype_status FROM records")}
                 self.assertEqual(statuses, {"NORMAL", "WATCH", "HIGH", "UNKNOWN"})

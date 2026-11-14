@@ -1,0 +1,59 @@
+name: Verify Naseem software
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install '.[serial]'
+      - run: python scripts/check.py
+  desktop:
+    name: Desktop (${{ matrix.os }}, Python ${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.10'
+          - os: windows-latest
+            python: '3.12'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install '.[serial]'
+      - run: python -m unittest discover -s tests -v
+      - run: python scripts/start.py doctor
+      - run: python scripts/start.py
+      - name: Windows batch launch and optional USB setup
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call Start-Naseem.cmd doctor
+          if errorlevel 1 exit /b 1
+          python scripts/setup_usb.py
+          if errorlevel 1 exit /b 1
+          call Start-Naseem.cmd ports
+          if errorlevel 1 exit /b 1
+  esp32:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install platformio==6.1.18
+      - run: python scripts/check.py --firmware

@@ -1,5 +1,5 @@
 // Academic scaffold ONLY. Not hardware tested. Not a safety device.
-// Sensor IO is disabled unless NASEEM_VERIFIED_WIRING=1. LCD/MQ7 stay disabled.
+// Sensor/display IO is explicitly gated. MQ7 stays disabled.
 #include <Arduino.h>
 #define ARDUINOJSON_USE_LONG_LONG 1
 #include <ArduinoJson.h>
@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include "protocol_guard.h"
 #include "sensor_adapters.h"
+#include "display_adapter.h"
 
 namespace {
 // Actual proposed pin defaults and enable flags live in sensor_config.h.
@@ -21,6 +22,7 @@ bool sequenceExhausted = false;
 naseem::ReplyGuard replyGuard;
 naseem::MonotonicUptime uptime;
 naseem::SensorAdapters sensors;
+naseem::DisplayAdapter display;
 uint8_t sentPollutants = 0, acceptedPollutants = 0;
 const char* sentQuality = "MISSING";
 char lcdLine1[17] = "UNKNOWN";
@@ -32,9 +34,9 @@ void setUnknown(const char* detail) {
 }
 
 void displayTick() {
-  // Deliberately no physical LCD writes. Adapt this hook only after verifying
-  // interface, controller, address, voltage, and board; render both padded lines.
-  // Never print LCD/debug text to Serial: that stream is newline JSON only.
+  // Disabled adapter is a no-op. Optional verified ILI9341 draws only changed
+  // guarded status rows and never writes debug text to the JSON serial stream.
+  display.tick(lcdLine1, lcdLine2);
 }
 
 void pollSgp30(uint32_t now) {
@@ -160,6 +162,8 @@ void setup() {
            static_cast<unsigned long>(esp_random()),
            static_cast<unsigned long>(esp_random()),
            static_cast<unsigned long>(esp_random()));
+  // Display startup waits must finish before the SGP30 one-second clock starts.
+  display.begin();
   sensors.begin();
   lastRecord = millis();
   emitReading(uptime.sample(lastRecord));

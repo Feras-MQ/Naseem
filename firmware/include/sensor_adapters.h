@@ -13,6 +13,7 @@
 namespace naseem {
 struct SensorAdapters {
   PmsParser pms;
+  WarmupGate pmsWarmup;
   SgpReadiness sgpReady;
   SgpSchedule sgpSchedule;
   uint32_t startedAt = 0, bmeAt = 0, lastBmeAttempt = 0;
@@ -50,12 +51,15 @@ struct SensorAdapters {
     sgpFound = sgp.begin(&Wire);
 #endif
     startedAt = lastBmeAttempt = millis();
+    pmsWarmup.reset(startedAt);
     sgpSchedule.restart(startedAt);
     if (sgpFound) sgpReady.reset(startedAt);
   }
   void poll(uint32_t now) {
     (void)now;
 #if NASEEM_ENABLE_PMS7003
+    pmsWarmup.poll(now, kPmsWarmMs);
+    pms.expire(now);
     for (unsigned i = 0; i < 128 && Serial2.available(); ++i) {
       int byte = Serial2.read();
       if (byte >= 0) pms.feed(static_cast<uint8_t>(byte), now);
@@ -100,7 +104,7 @@ struct SensorAdapters {
   }
   const char* pmsStatus(uint32_t now) const {
 #if NASEEM_ENABLE_PMS7003
-    if (!elapsed(now, startedAt, kPmsWarmMs)) return "warming_up";
+    if (!pmsWarmup.complete) return "warming_up";
     if (!pms.received) return pms.rejected ? "error" : "missing";
     return pms.fresh(now) ? "ok" : "error";
 #else

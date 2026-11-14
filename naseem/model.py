@@ -42,7 +42,7 @@ def _no_duplicates(pairs):
     obj = {}
     for key, value in pairs:
         if key in obj:
-            raise ValidationError(f"Duplicate JSON key: {key}")
+            raise ValidationError(f"Duplicate JSON key: {key!r}")
         obj[key] = value
     return obj
 

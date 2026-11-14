@@ -9,7 +9,9 @@ The following product names and identifiers were supplied for this project. They
 | VOC/eCO2 | Hailege GY-SGP30, B0CJY2QKLL | Optional 1 Hz IAQ adapter, default disabled |
 | Environmental | RELAND SUN BME280 labelled “5V”, B09WB3J9MC | Optional I2C adapter with sensor-ID check, default disabled |
 | Gas raw diagnostics | TopHomer MQ-7, B08QHN6QFD | Disabled; heater circuitry, timing and ADC protection unverified |
-| LCD | Not yet identified | Physical output disabled; LCD text/protocol guards remain available |
+| Display | User reports buying a 2.8-inch version of an earlier recommendation; actual controller/interface/PCB still unverified | Optional ILI9341 SPI software candidate; disabled by default and **not confirmed compatible** with the purchased display |
+
+The original report named a 16×2 LCD. The later 2.8-inch purchase supersedes that size assumption, but does not identify its controller, pin order, touch controller, backlight power or logic levels. The user also reports buying a soldered sensor; the order-to-part linkage and delivered chip remain unverified. No new sensor identity is inferred from that description. See [display integration](DISPLAY.md).
 
 ## Important distinction: sensor and breakout board
 

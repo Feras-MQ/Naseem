@@ -54,6 +54,26 @@ int main() {
     assert(overlap.used < 32);
   }
   assert(frame(overlap, f, 100001));
+  // Completed startup is latched across full clock cycles until reset.
+  WarmupGate warmup;
+  warmup.reset(100);
+  warmup.poll(30099, kPmsWarmMs); assert(!warmup.complete);
+  warmup.poll(30100, kPmsWarmMs); assert(warmup.complete);
+  warmup.poll(UINT32_MAX, kPmsWarmMs);
+  warmup.poll(101, kPmsWarmMs); assert(warmup.complete);
+  warmup.reset(UINT32_MAX - 100);
+  warmup.poll(100, kPmsWarmMs); assert(!warmup.complete);
+  warmup.poll(30000, kPmsWarmMs); assert(warmup.complete);
+
+  // A silent PMS must never revive its old data one complete clock cycle later.
+  PmsParser stopped;
+  assert(frame(stopped, f, 100));
+  stopped.expire(10099); assert(stopped.fresh(10099));
+  stopped.expire(10100); assert(!stopped.fresh(10100));
+  stopped.expire(UINT32_MAX);
+  stopped.expire(101); assert(!stopped.fresh(101));
+  assert(frame(stopped, f, 102)); assert(stopped.fresh(103));
+
   assert(allSupportFresh(3, 3));
   assert(!allSupportFresh(3, 1)); // SGP lost, PMS fresh: revoke HIGH/WATCH.
   assert(!allSupportFresh(3, 2)); // PMS lost, SGP fresh: same conservative gate.
@@ -86,6 +106,17 @@ int main() {
   assert(sgp.sample(16000, true)); assert(sgp.fresh(17000));
   assert(!sgp.fresh(17501)); assert(sgp.missed(17501));
   assert(!sgp.sample(18000, true));
+  // Keep a second SGP clock sampled continuously through a complete millis()
+  // cycle; initializedAt becomes close again, but startup must not repeat.
+  SgpReadiness continuous;
+  continuous.reset(0);
+  for (uint64_t t = 1000; t < (1ULL << 32) + 20000; t += 1000) {
+    const bool ready = continuous.sample(static_cast<uint32_t>(t), true);
+    assert(ready == (t >= 16000));
+  }
+  continuous.reset(20000);
+  assert(!continuous.sample(21000, true)); // Explicit reset does warm up again.
+
   sgp.reset(18000); assert(!sgp.sample(19000, false));
   assert(!sgp.fresh(19000));
   sgp.reset(UINT32_MAX - 500);

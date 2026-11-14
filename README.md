@@ -1,17 +1,44 @@
-# Naseem local prototype baseline, version 0.2
+# Naseem local prototype baseline, version 0.4
 
 A runnable **academic software baseline**, based on the supplied *Indoor Air Quality Monitoring System with AI* report and slides. It implements local Python processing, a deterministic simulator, USB serial ingestion, SQLite journaling, explainable configurable rules, trend detection and CSV export. Optional PMS7003, SGP30 and BME280 firmware adapters are included but disabled in the default build. **No web/mobile dashboard or cloud service.**
 
 ## What is and is not complete
 
-- **Implemented and tested locally:** JSON protocol validation, synthetic simulation, replay, Python rule engine, SQLite/CSV, serial adapter using a fake device, and firmware timing/response guard tests.
-- **Implemented, not tested on ESP32 hardware:** optional PMS7003 UART parsing/acquisition, SGP30 one-second IAQ acquisition and BME280 environmental acquisition. Host tests cover their portable parsing/readiness helpers, not the actual drivers.
+- **New operator tools:** empty database setup, read-only history/integrity inspection, consistent backups, optional USB preflight, port listing and isolated demo reports.
+- **Implemented and tested locally:** JSON protocol validation, synthetic simulation, replay, Python rule engine, SQLite/CSV, serial adapter using a fake device, firmware timing/response guard tests, display row rendering and virtual-port serial recovery.
+- **Implemented, not tested on ESP32 hardware:** optional PMS7003 UART parsing/acquisition, SGP30 one-second IAQ acquisition and BME280 environmental acquisition. Host tests cover portable parsing/readiness helpers; ESP32 builds check driver compatibility, not physical behavior.
 - **Gated by default:** the dry firmware still sends null/missing readings and remains UNKNOWN without initializing sensor buses. A separate opt-in configuration enables the three adapters only after wiring is verified.
-- **Still scaffold only:** MQ-7 acquisition/heater control and physical LCD writes. Both remain disabled. No CO ppm conversion is supplied.
-- **Not verified:** real serial hardware, ESP32 compilation, any actual sensor, wiring, calibration, electrical behavior, or measurement accuracy. No firmware was flashed. No device was connected.
+- **Cross-compiled:** the default, BME-only, BME+PMS and three-sensor ESP32 profiles, plus display-only and sensors+display compile fixtures: **all six passed**. See [verification](docs/VALIDATION.md).
+- **New display software:** an optional ILI9341 SPI adapter and tested two-row renderer. It is disabled by default and is not confirmed compatible with the purchased 2.8-inch screen. See [display integration](docs/DISPLAY.md).
+- **Still scaffold only:** MQ-7 acquisition/heater control. It remains disabled. No CO ppm conversion is supplied.
+- **Not verified:** real serial hardware, any actual sensor, wiring, calibration, electrical behavior, or measurement accuracy. No firmware was flashed. No device was connected.
 - **No measured experimental results are included.** Every example data row is labelled `synthetic`. Demo output is not evidence of physical performance.
 
 **This is not a certified smoke/CO alarm, medical instrument or safety device.** NORMAL means only “the available configured signals are below illustrative rules.” It does not establish that air is safe. HIGH means a classroom threshold was exceeded, not an official hazardous-air determination. eCO2 is an estimated equivalent-CO2 signal, **not measured CO2**. MQ-7 ADC counts are raw diagnostics, never converted to ppm or used for a CO safety claim. Continue to use certified alarms. Do not create smoke, CO, hazardous gases, dust clouds or chemical exposures for testing this project.
+
+For the team: [short Arabic/English getting-started guide](docs/QUICK_START.md) and [software/database guide](docs/SOFTWARE_GUIDE.md).
+
+## Easiest start before the parts arrive
+
+Use the **review branch linked in [PR #1](https://github.com/Feras-MQ/Naseem/pull/1)**, not the older default-branch ZIP. The update is not merged.
+
+On Windows with Python 3.10+, extract the whole folder and double-click **Start-Naseem.cmd**. It creates a fresh demonstration under `data/demos/` and prints the path to **report.html**. Open that file to see the four signal charts, status timeline, explanations and downloadable records. The report is an offline export, not a live dashboard. Nothing connects to a device.
+
+On any supported desktop, the same launcher is:
+
+```sh
+python scripts/start.py
+```
+
+SQLite is included with Python: there is **no database server or account to install**. Prepare an empty recording database and check software readiness with:
+
+```sh
+python scripts/start.py doctor
+python scripts/start.py init-db --db data/hardware.sqlite3
+python scripts/start.py inspect --db data/hardware.sqlite3
+```
+
+The demo has its own database and never uses `data/hardware.sqlite3`. Optional USB setup and later recording instructions are in the guide below. Native Windows execution is checked by the `desktop` CI job; see that run's actual result before treating a new revision as verified.
 
 ## Quick start (no dependencies, Python 3.10+)
 
@@ -25,9 +52,26 @@ python -m unittest discover -s tests -v
 
 The demo runs quickly using **virtual device time**, advancing 5,000 ms per record. Seventy-two records span six minutes of synthetic samples, with the final timestamp at 355 seconds. The host receive timestamps reflect actual execution, not those virtual times. Add `--realtime` to wait five seconds between records. It does not turn the data into measurements.
 
-The mixed demo contains initial warm-up, stable signals, a rise, a high-threshold event, a missing sensor and recovery. Available scenarios: `stable`, `rising`, `high`, `missing`, `warming_up`, `mixed`. Add `--verbose` to print per-record explanations and two 16-character LCD lines. The terminal is the only desktop display.
+The mixed demo contains initial warm-up, stable signals, a rise, a high-threshold event, a missing sensor and recovery. Available scenarios: `stable`, `rising`, `high`, `missing`, `warming_up`, `mixed`. Add `--verbose` to print per-record explanations and two 16-character LCD lines. The terminal controls recording; `demo` also produces an offline HTML report. The optional ESP32 display is a separate hardware output, not a live website or desktop dashboard.
 
-Examples under `examples/` are pre-generated **synthetic demonstrations**, not real room data. CSV/JSONL outputs use exclusive creation: choose a new filename if it already exists. SQLite can append a new, separately identified run to the same compatible journal.
+Examples under `examples/` are preserved version-0.2 **synthetic demonstrations**, not real room data. Run the quick-start commands to generate a new capture with the current software version. CSV/JSONL outputs use exclusive creation: choose a new filename if it already exists. SQLite can append a new, separately identified run to the same compatible journal.
+
+## Repeat all software checks
+
+```sh
+python scripts/check.py
+```
+
+This runs Python tests, native C++ firmware helper tests and display/sensor
+configuration checks. It needs a GCC-compatible C++ compiler. Install the
+optional `.[serial]` dependency to include the real pyserial virtual-port test
+on Linux/macOS; it is explicitly skipped on Windows or without pyserial.
+
+For cross-compilation, install PlatformIO 6.1.18 in a separate development
+virtual environment and run `python scripts/check.py --firmware`. This builds
+all six profiles and never uploads firmware. The two display profiles are
+compile fixtures with arbitrary pins and have an upload guard. Keep the
+default firmware dry until the actual boards are identified.
 
 ## Replay a capture
 
@@ -71,6 +115,6 @@ Each run stores the full rule configuration and SHA-256 hash, software version a
 
 ## Assumptions and next step
 
-Assumptions: local desktop Python 3.10+, one ESP32 stream per run, PMS7003/SGP30/BME280/MQ-7 and 16×2 I2C LCD as named in the report. The supplied hardware references are HiLetgo ESP-WROOM-32, OEM PMS7003, Hailege GY-SGP30, RELAND SUN BME280 labelled 5V and TopHomer MQ-7; see the inventory for product identifiers. Exact PCB revisions, power/level-shifting arrangements, LCD identity, OS and ports remain unverified. The Python baseline is OS-neutral and was tested here on Linux/Python 3.12.14. Firmware board `esp32dev` is a family-level starting target, not verified board wiring.
+Assumptions: local desktop Python 3.10+, one ESP32 stream per run, and PMS7003/SGP30/BME280/MQ-7 as named in the report. A later purchase is a 2.8-inch screen; its controller and interface are unverified. The original 16×2 protocol text remains supported without assuming a 16×2 physical LCD. The supplied hardware references are HiLetgo ESP-WROOM-32, OEM PMS7003, Hailege GY-SGP30, RELAND SUN BME280 labelled 5V and TopHomer MQ-7; see the inventory for product identifiers. Exact PCB revisions, power/level-shifting arrangements, LCD identity, OS and ports remain unverified. The Python baseline is OS-neutral and was tested here on Linux/Python 3.12.14. Firmware board `esp32dev` is a family-level starting target, not verified board wiring.
 
-To turn this into a real prototype, confirm board/module photographs, actual power and logic levels, LCD backpack voltage/controller and operating system. Then compile, enable and physically verify one adapter at a time using the checklists. The available optional sensor target does not itself confirm safe wiring or authorize flashing. No account, cloud, dashboard, dataset download or Kaggle claim is needed for this baseline.
+To turn this into a real prototype, confirm board/module photographs, actual power and logic levels, actual display voltage/interface/controller and operating system. Then compile, enable and physically verify one adapter at a time using the checklists. The available optional sensor target does not itself confirm safe wiring or authorize flashing. No account, cloud, dashboard, dataset download or Kaggle claim is needed for this baseline.

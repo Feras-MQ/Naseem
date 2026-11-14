@@ -68,8 +68,11 @@ struct ReplyGuard {
     accepted = true;
     acceptedAt = now;
   }
-  bool timedOut(uint32_t now) const {
-    return !accepted || elapsed(now, acceptedAt, kHostTimeoutMs);
+  bool timedOut(uint32_t now) {
+    // Poll regularly: once expired, an old reply cannot become current again
+    // when the 32-bit clock returns to acceptedAt after a full cycle.
+    if (accepted && elapsed(now, acceptedAt, kHostTimeoutMs)) accepted = false;
+    return !accepted;
   }
 };
 }  // namespace naseem

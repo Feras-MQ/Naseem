@@ -1,5 +1,6 @@
 """Host preprocessor checks only, not an ESP32 firmware build."""
 from pathlib import Path
+import os
 import subprocess
 import unittest
 
@@ -9,7 +10,7 @@ FLAGS = ["NASEEM_ENABLE_BME280", "NASEEM_ENABLE_PMS7003", "NASEEM_ENABLE_SGP30"]
 class SensorConfig(unittest.TestCase):
     def preprocess(self, *definitions):
         return subprocess.run(
-            ["g++", "-E", "-x", "c++", f"-I{INCLUDE}",
+            [os.environ.get("CXX", "g++"), "-E", "-x", "c++", f"-I{INCLUDE}",
              *[f"-D{value}" for value in definitions], "-"],
             input='#include "sensor_config.h"\n', text=True,
             capture_output=True).returncode
