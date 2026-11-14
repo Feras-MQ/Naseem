@@ -133,7 +133,10 @@ class UsbSetupTests(unittest.TestCase):
             self.assertEqual(setup_usb.setup(self.root), 0)
             builder.assert_not_called()
             command = run.call_args_list[1].args[0]
-            self.assertEqual(command[0], str(executable))
+            # Windows temp paths may use an 8.3 alias (RUNNER~1), whereas
+            # setup canonicalizes the root. Both spellings must identify the
+            # same local interpreter, rather than matching raw path strings.
+            self.assertTrue(Path(command[0]).samefile(executable))
             self.assertIn("--require-virtualenv", command)
             self.assertIn("--isolated", command)
             self.assertEqual(command[-1], str(self.root.resolve()) + "[serial]")
@@ -147,7 +150,7 @@ class UsbSetupTests(unittest.TestCase):
                 patch.object(setup_usb.subprocess, "run", side_effect=[self.probe(), SimpleNamespace(returncode=0)]), redirect_stdout(io.StringIO()):
             self.assertEqual(setup_usb.setup(self.root), 0)
             builder.assert_called_once_with(with_pip=True, system_site_packages=False, clear=False)
-            builder_instance.create.assert_called_once_with(self.environment)
+            builder_instance.create.assert_called_once_with(self.environment.resolve())
 
     def test_shared_site_packages_rejected_before_interpreter_run(self):
         self.make_environment(shared=True)

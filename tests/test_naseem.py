@@ -1,3 +1,4 @@
+from contextlib import closing
 import copy
 import csv
 import io
@@ -248,7 +249,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             temp = Path(temp); db = temp / "demo.sqlite3"; packets = temp / "synthetic.jsonl"
             self.assertEqual(main(["simulate", "--db", str(db), "--samples", "72", "--jsonl", str(packets)]), 0)
-            with sqlite3.connect(db) as con:
+            with closing(sqlite3.connect(db)) as con, con:
                 self.assertEqual(con.execute("SELECT count(*) FROM records").fetchone()[0], 72)
                 statuses = {r[0] for r in con.execute("SELECT DISTINCT prototype_status FROM records")}
                 self.assertEqual(statuses, {"NORMAL", "WATCH", "HIGH", "UNKNOWN"})

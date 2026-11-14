@@ -1,3 +1,4 @@
+from contextlib import closing
 import csv
 import json
 from pathlib import Path
@@ -30,7 +31,7 @@ class DemoTests(unittest.TestCase):
             self.assertEqual([row["uptime_ms"] for row in packets], list(range(0, 360000, 5000)))
             self.assertEqual({row["source"] for row in packets}, {"synthetic"})
             self.assertEqual({row["boot_id"] for row in packets}, {summary["run_id"]})
-            with sqlite3.connect(output / "SYNTHETIC_demo.sqlite3") as db:
+            with closing(sqlite3.connect(output / "SYNTHETIC_demo.sqlite3")) as db, db:
                 self.assertEqual(db.execute("PRAGMA integrity_check").fetchone(), ("ok",))
                 self.assertEqual(db.execute("SELECT count(*) FROM events").fetchone(), (0,))
                 run = db.execute("SELECT run_id, ended_at_utc, mode, config_sha256, software_version FROM runs").fetchone()
@@ -72,7 +73,7 @@ class DemoTests(unittest.TestCase):
                     create_demo(folder)
             self.assertIn("INCOMPLETE", (folder / "INCOMPLETE.txt").read_text())
             self.assertFalse((folder / "summary.json").exists())
-            with sqlite3.connect(folder / "SYNTHETIC_demo.sqlite3") as db:
+            with closing(sqlite3.connect(folder / "SYNTHETIC_demo.sqlite3")) as db, db:
                 self.assertEqual(db.execute("SELECT count(*) FROM records").fetchone(), (72,))
                 self.assertIsNotNone(db.execute("SELECT ended_at_utc FROM runs").fetchone()[0])
 

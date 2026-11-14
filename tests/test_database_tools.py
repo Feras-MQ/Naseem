@@ -1,4 +1,5 @@
 """Operator database tests: provenance, preservation, and consistent snapshots."""
+from contextlib import closing
 from contextlib import redirect_stdout, redirect_stderr
 import hashlib
 import io
@@ -60,7 +61,7 @@ class DatabaseToolsTests(unittest.TestCase):
         self.assertFalse((self.root / 'copy.csv').exists())
 
     def test_foreign_database_unchanged(self):
-        with sqlite3.connect(self.db) as con:
+        with closing(sqlite3.connect(self.db)) as con, con:
             con.execute('CREATE TABLE important (value TEXT)')
             con.execute('INSERT INTO important VALUES (?)', ('keep',))
         before = self.digest(self.db)
@@ -71,14 +72,14 @@ class DatabaseToolsTests(unittest.TestCase):
             self.assertEqual(self.digest(self.db), before)
 
     def test_empty_foreign_app_id_not_claimed(self):
-        with sqlite3.connect(self.db) as con: con.execute('PRAGMA application_id=9876')
+        with closing(sqlite3.connect(self.db)) as con, con: con.execute('PRAGMA application_id=9876')
         before = self.digest(self.db)
         with self.assertRaises(ValueError): initialize_database(self.db)
         self.assertEqual(self.digest(self.db), before)
 
     def test_future_schema_not_silently_downgraded(self):
         initialize_database(self.db)
-        with sqlite3.connect(self.db) as con: con.execute('PRAGMA user_version=999')
+        with closing(sqlite3.connect(self.db)) as con, con: con.execute('PRAGMA user_version=999')
         before = self.digest(self.db)
         for operation in (lambda: initialize_database(self.db), lambda: inspect_database(self.db),
                           lambda: export_csv(self.db, self.root / 'wrong.csv')):
@@ -88,7 +89,7 @@ class DatabaseToolsTests(unittest.TestCase):
 
     def test_partial_schema_not_silently_repaired(self):
         initialize_database(self.db)
-        with sqlite3.connect(self.db) as con: con.execute('DROP TABLE events')
+        with closing(sqlite3.connect(self.db)) as con, con: con.execute('DROP TABLE events')
         before = self.digest(self.db)
         with self.assertRaises(ValueError): initialize_database(self.db)
         self.assertEqual(self.digest(self.db), before)
@@ -155,17 +156,17 @@ class DatabaseToolsTests(unittest.TestCase):
 
     def test_broken_foreign_key_detected(self):
         self.populate()
-        with sqlite3.connect(self.db) as con: con.execute("UPDATE records SET run_id='missing'")
+        with closing(sqlite3.connect(self.db)) as con, con: con.execute("UPDATE records SET run_id='missing'")
         with self.assertRaisesRegex(ValueError, 'broken run'): inspect_database(self.db)
 
     def test_initialization_failure_rolls_back_and_can_retry(self):
         from naseem.storage import _prepare_schema
-        with sqlite3.connect(":memory:") as con:
+        with closing(sqlite3.connect(":memory:")) as con, con:
             def deny_events(action, name, *_):
                 return sqlite3.SQLITE_DENY if action == sqlite3.SQLITE_CREATE_TABLE and name == "events" else sqlite3.SQLITE_OK
             con.set_authorizer(deny_events)
             with self.assertRaises(sqlite3.Error): _prepare_schema(con)
-            con.set_authorizer(None)
+            con.set_authorizer(lambda *_: sqlite3.SQLITE_OK)
             self.assertEqual(con.execute("SELECT name FROM sqlite_master").fetchall(), [])
             self.assertEqual(con.execute("PRAGMA application_id").fetchone()[0], 0)
             _prepare_schema(con)
@@ -175,7 +176,7 @@ class DatabaseToolsTests(unittest.TestCase):
     def test_run_metadata_uses_explicit_columns(self):
         from naseem import __version__
         initialize_database(self.db)
-        with sqlite3.connect(self.db) as con:
+        with closing(sqlite3.connect(self.db)) as con, con:
             con.execute("DROP TABLE runs")
             con.execute("CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at_utc TEXT NOT NULL, ended_at_utc TEXT, mode TEXT NOT NULL, config_sha256 TEXT NOT NULL, config_json TEXT NOT NULL, disclaimer TEXT NOT NULL, software_version TEXT NOT NULL)")
         with Journal(self.db, "simulate", load_config()) as journal:

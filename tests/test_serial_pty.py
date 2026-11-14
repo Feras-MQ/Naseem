@@ -1,4 +1,5 @@
 """Real pyserial/OS transport test using a virtual port, never physical sensors."""
+from contextlib import closing
 import importlib.util
 import json
 import os
@@ -76,7 +77,7 @@ raise SystemExit(main(sys.argv[1:]))
                 self.assertEqual(responses[-1]["sequence"], 11)
                 self.assertEqual(responses[-1]["boot_id"], "virtual-port-fixture")
                 self.assertTrue(all(len(line) < 512 for line in received.splitlines()))
-                with sqlite3.connect(database) as db:
+                with closing(sqlite3.connect(database)) as db, db:
                     self.assertEqual(db.execute("SELECT count(*) FROM records").fetchone()[0], 2)
                     self.assertEqual(db.execute("SELECT count(*) FROM events WHERE kind='invalid_record'").fetchone()[0], 1)
             finally:
